@@ -26,10 +26,9 @@ namespace fui = freeink::ui;
 
 namespace {
 constexpr const char* LOG_TAG = "NOTE";
-constexpr const char* WEEKDAY_NAMES[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
-                                         "Saturday"};
+constexpr const char* WEEKDAY_NAMES[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 constexpr const char* MONTH_NAMES[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+                                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 void formatNoteDate(const sticky_note::Note& note, char* output, const size_t outputSize) {
   std::tm date{};
@@ -43,7 +42,7 @@ void formatNoteDate(const sticky_note::Note& note, char* output, const size_t ou
   snprintf(output, outputSize, "%s, %s %02u %04u", WEEKDAY_NAMES[weekday], MONTH_NAMES[note.month - 1],
            static_cast<unsigned>(note.day), static_cast<unsigned>(note.year));
 }
-}
+}  // namespace
 
 StickyNotesActivity::StickyNotesActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
     : Activity("StickyNotes", renderer, mappedInput),
@@ -209,8 +208,8 @@ void StickyNotesActivity::processPendingNote() {
   note_ = pendingNote;
   noteFontId_ = UI_12_FONT_ID;
   if (SETTINGS.stickyNoteSdFontFamilyName[0] != '\0') {
-    const auto activation = sdFontSystem.activateDictionaryFont(
-        renderer, SETTINGS.stickyNoteSdFontFamilyName, SETTINGS.stickyNoteFontPointSize);
+    const auto activation = sdFontSystem.activateDictionaryFont(renderer, SETTINGS.stickyNoteSdFontFamilyName,
+                                                                SETTINGS.stickyNoteFontPointSize);
     if (activation.fontId != 0) noteFontId_ = activation.fontId;
     sdFontSystem.releaseRegistry();
   }
@@ -278,8 +277,7 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
   const int right = safeArea.x + safeArea.width - sideInset - 1;
   const int titleY = safeArea.y + 16;
   const int titleLineHeight = renderer.getLineHeight(UI_12_FONT_ID);
-  UITheme::drawCenteredText(renderer, safeArea, UI_12_FONT_ID, titleY, tr(STR_NOTES_TITLE), true,
-                            EpdFontFamily::BOLD);
+  UITheme::drawCenteredText(renderer, safeArea, UI_12_FONT_ID, titleY, tr(STR_NOTES_TITLE), true, EpdFontFamily::BOLD);
 
   const int firstRuleY = titleY + titleLineHeight + 14;
   renderer.drawLine(left, firstRuleY, right, firstRuleY, 2, true);
@@ -293,49 +291,33 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
   const int footerReserve = showSavedStatus ? renderer.getLineHeight(SMALL_FONT_ID) + 20 : 0;
   const int messageTop = secondRuleY + 22;
   const int messageBottom = safeArea.y + safeArea.height - footerReserve;
-  const int messageHeight = std::max(1, messageBottom - messageTop);
   const int lineHeight = renderer.getLineHeight(noteFontId_) + 5;
-  int itemCount = 1;
-  for (uint8_t i = 0; i < note_.messageLength; ++i) {
-    if (note_.message[i] == '\n') ++itemCount;
-  }
-  const int maxRows = std::max(1, messageHeight / (lineHeight + 8));
-  const int visibleRows = std::min(itemCount, maxRows);
-  const int rowHeight = std::max(lineHeight, messageHeight / visibleRows);
-  const int markerWidth = renderer.getTextWidth(noteFontId_, "[x]", EpdFontFamily::BOLD) + 14;
-  const int textLeft = left + markerWidth;
+
+  const int textLeft = left;
   const int textWidth = std::max(1, right - textLeft + 1);
+  int textY = messageTop;
   char* row = note_.message.data();
 
-  for (int rowIndex = 0; rowIndex < visibleRows; ++rowIndex) {
+  while (row && *row && textY + lineHeight <= messageBottom) {
     char* newline = strchr(row, '\n');
     if (newline) *newline = '\0';
-
-    const bool showOverflow = itemCount > maxRows && rowIndex == visibleRows - 1;
-    const char* marker = "";
-    const char* text = showOverflow ? "..." : row;
-    if (!showOverflow && strncmp(row, "[x] ", 4) == 0) {
-      marker = "[x]";
-      text = row + 4;
-    } else if (!showOverflow && strncmp(row, "[ ] ", 4) == 0) {
-      marker = "[ ]";
-      text = row + 4;
+    const int remainingLines = std::max(1, (messageBottom - textY) / lineHeight);
+    const auto lines = renderer.wrappedText(noteFontId_, row, textWidth, remainingLines);
+    for (const auto& line : lines) {
+      if (textY + lineHeight > messageBottom) break;
+      renderer.drawText(noteFontId_, textLeft, textY, line.c_str());
+      textY += lineHeight;
     }
 
-    const int rowTop = messageTop + rowIndex * rowHeight;
-    const int textY = rowTop + std::max(0, (rowHeight - lineHeight) / 2);
-    if (*marker) renderer.drawText(noteFontId_, left, textY, marker, false, EpdFontFamily::BOLD);
-    const auto lines = renderer.wrappedText(noteFontId_, text, textWidth, 1);
-    if (!lines.empty()) renderer.drawText(noteFontId_, textLeft, textY, lines.front().c_str());
-
-    if (newline) *newline = '\n';
-    if (rowIndex + 1 < visibleRows) {
-      const int ruleY = rowTop + rowHeight - 1;
-      renderer.drawLine(left, ruleY, right, ruleY, 1, true);
+    if (newline) {
+      *newline = '\n';
+      row = newline + 1;
+      textY += 4;
+    } else {
+      break;
     }
-    if (!newline) break;
-    row = newline + 1;
   }
+
   if (showSavedStatus) {
     UITheme::drawCenteredText(renderer, safeArea, SMALL_FONT_ID,
                               safeArea.y + safeArea.height - renderer.getLineHeight(SMALL_FONT_ID) - 4,
@@ -350,7 +332,7 @@ bool StickyNotesActivity::saveNoteSleepImage() {
   }
   if (Storage.exists(NOTE_TEMP_PATH)) Storage.remove(NOTE_TEMP_PATH);
   if (!ScreenshotUtil::saveFramebufferAsBmp(NOTE_TEMP_PATH, renderer.getFrameBuffer(), renderer.getDisplayWidth(),
-                                             renderer.getDisplayHeight())) {
+                                            renderer.getDisplayHeight())) {
     LOG_ERR(LOG_TAG, "Failed to write temporary note bitmap");
     return false;
   }

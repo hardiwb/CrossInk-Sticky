@@ -307,7 +307,7 @@ HomeMenuEntries buildMinimalMenuItems(bool hasOpdsServers, bool hasReadingStats,
 
   items.push({tr(STR_FILE_TRANSFER), Transfer, HomeMenuAction::FileTransfer});
 #if CROSSINK_ENABLE_STICKY_NOTES
-  items.push({tr(STR_STICKY_NOTES), Transfer, HomeMenuAction::StickyNotes});
+  items.push({tr(STR_BROWSE_FILES), Transfer, HomeMenuAction::BrowseFiles});
 #endif
   return items;
 }
@@ -603,8 +603,7 @@ static_assert(HomeActivity::kMaxCachedBooks >= LyraCarouselMetrics::values.homeR
 
 int HomeActivity::getMenuItemCount() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  int count = static_cast<int>(
-      buildHomeMenuItems(hasOpdsServers, hasReadingStats, hasBookmarks, hasClippings).size());
+  int count = static_cast<int>(buildHomeMenuItems(hasOpdsServers, hasReadingStats, hasBookmarks, hasClippings).size());
   if (!metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
     count += getVisibleRecentBookCount();
   } else if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
@@ -1566,7 +1565,11 @@ void HomeActivity::loop() {
           requestUpdate();
           break;
         case 1:
+#if CROSSINK_ENABLE_STICKY_NOTES
+          onStickyNotesOpen();
+#else
           onFileBrowserOpen();
+#endif
           break;
         case 2:
           onSettingsOpen();
@@ -1944,8 +1947,13 @@ void HomeActivity::render(RenderLock&&) {
     }
     if (showMinimalHomeButtonHints(mappedInput)) {
       MinimalTheme::setHomeButtonHintSelection(minimalHomeNavIndex);
+#if CROSSINK_ENABLE_STICKY_NOTES
+      GUI.drawButtonHints(renderer, tr(STR_MENU), tr(STR_STICKY_NOTES), tr(STR_SETTINGS_SHORT),
+                          recentBooks.empty() ? "" : tr(STR_READ));
+#else
       GUI.drawButtonHints(renderer, tr(STR_MENU), tr(STR_BROWSE), tr(STR_SETTINGS_SHORT),
                           recentBooks.empty() ? "" : tr(STR_READ));
+#endif
     }
 
     displayHomeBuffer();
