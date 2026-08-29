@@ -15,7 +15,9 @@ The main goal of this fork is to add a small productivity layer to CrossInk with
 
 ### Sticky Notes
 
-![Sticky Notes on CrossInk](./docs/images/StickynotesCrossink.jpeg)
+<p align="center">
+  <img src="./docs/images/StickynotesCrossink.jpeg" alt="Sticky Notes on CrossInk" width="480">
+</p>
 
 - Added **Sticky Notes** support to Xteink X3/X4.
 - Notes are currently received through **ESP-NOW**.
