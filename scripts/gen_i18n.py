@@ -756,11 +756,10 @@ def _print_language_table(
     sep = "  ".join("-" * w for w in col_widths)
 
     def _safe_print(line: str) -> None:
-        print(
-            line.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(
-                sys.stdout.encoding or "utf-8", errors="replace"
-            )
-        )
+        # PlatformIO may decode this subprocess as UTF-8 and then forward it to
+        # a CP-1252 Windows console. Keep the diagnostic table ASCII-only so its
+        # output reader does not die while the build continues silently.
+        print(line.encode("ascii", errors="replace").decode("ascii"))
 
     _safe_print(fmt.format(*headers))
     _safe_print(sep)

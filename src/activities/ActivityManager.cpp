@@ -17,6 +17,9 @@
 #include "boot_sleep/SleepActivity.h"
 #include "browser/OpdsBookBrowserActivity.h"
 #include "components/TouchRegistry.h"
+#if CROSSINK_ENABLE_STICKY_NOTES
+#include "features/sticky_notes/StickyNotesActivity.h"
+#endif
 #include "home/AlertActivity.h"
 #include "home/CrashActivity.h"
 #include "home/FileBrowserActivity.h"
@@ -287,6 +290,17 @@ void ActivityManager::goToNearbyBookReceive() {
   }
   replaceActivity(std::move(activity));
 }
+
+#if CROSSINK_ENABLE_STICKY_NOTES
+void ActivityManager::goToStickyNotes() {
+  auto activity = makeUniqueNoThrow<StickyNotesActivity>(renderer, mappedInput);
+  if (!activity) {
+    LOG_ERR("ACT", "OOM: sticky notes receiver");
+    return;
+  }
+  replaceActivity(std::move(activity));
+}
+#endif
 
 void ActivityManager::goToCalibreWireless(const std::string& returnBookPath) {
   restartToFileTransfer(NetworkMode::CONNECT_CALIBRE, returnBookPath);

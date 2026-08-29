@@ -1,0 +1,88 @@
+#pragma once
+
+#include "StickyNotesConfig.h"
+
+#if CROSSINK_ENABLE_STICKY_NOTES
+
+#include <FreeInkApp.h>
+#include <FreeInkUIGfxRenderer.h>
+
+#include <array>
+#include <atomic>
+
+#include <I18n.h>
+
+#include "StickyNoteProtocol.h"
+#include "activities/Activity.h"
+#include "activities/ScreenTransitionRefresh.h"
+#include "components/UIThemeTokens.h"
+
+#ifndef SIMULATOR
+#include <HalEspNow.h>
+#include <freertos/semphr.h>
+#endif
+
+class StickyNotesActivity final : public Activity {
+ public:
+  StickyNotesActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
+  ~StickyNotesActivity() override;
+
+  void onEnter() override;
+  void onExit() override;
+  void loop() override;
+  void render(RenderLock&&) override;
+  bool preventAutoSleep() override { return true; }
+  bool skipLoopDelay() override { return state_ == State::Listening; }
+
+ private:
+  enum class State : uint8_t { Ready, Listening, Applying, Saved, Error };
+
+  static constexpr uint8_t ESPNOW_CHANNEL = 1;
+  static constexpr uint32_t RECEIVE_TIMEOUT_MS = 60000;
+  static constexpr const char* NOTE_PATH = "/.sleep/sticky-note.bmp";
+  static constexpr const char* NOTE_TEMP_PATH = "/.sleep/sticky-note.part.bmp";
+  static constexpr const char* NOTE_BACKUP_PATH = "/.sleep/sticky-note.bak.bmp";
+  static constexpr freeink::ui::ActionId ACTION_RECEIVE = 1;
+
+  using UiApp = freeink::ui::FreeInkApp<4, 4>;
+  freeink::ui::GfxRendererTarget uiTarget_;
+  UiApp app_;
+  std::atomic<bool> uiReady_{false};
+  ScreenTransitionRefresh screenTransitionRefresh_;
+  State state_ = State::Ready;
+  StrId errorId_ = StrId::STR_STICKY_NOTE_INVALID;
+  sticky_note::Note note_;
+  int noteFontId_ = 0;
+  uint32_t listeningStartedMs_ = 0;
+  bool radioUsed_ = false;
+
+#ifndef SIMULATOR
+  HalEspNow radio_;
+  SemaphoreHandle_t pendingMutex_ = nullptr;
+  sticky_note::Note pendingNote_;
+  std::array<uint8_t, 6> pendingSourceMac_{};
+  bool pending_ = false;
+#endif
+
+  static void menuScreen(UiApp::ScreenType& screen, void* user);
+  static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
+  void buildMenuScreen(UiApp::ScreenType& screen);
+  void startReceiving();
+  void stopReceiving();
+  void processPendingNote();
+  void setState(State state);
+  void setError(StrId errorId);
+  void exitActivity();
+  void drawStatusScreen(const char* status, bool showReceiveAction);
+  void drawNoteTemplate(bool showSavedStatus);
+  bool saveNoteSleepImage();
+  bool selectNoteSleepImage();
+
+#ifndef SIMULATOR
+  static void onReceive(const uint8_t* sourceMac, const uint8_t* data, int length, void* context);
+  void enqueueNote(const uint8_t* sourceMac, const uint8_t* data, int length);
+  bool sendAck(const uint8_t* peerMac, uint32_t sequence);
+#endif
+};
+
+#endif  // CROSSINK_ENABLE_STICKY_NOTES

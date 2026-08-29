@@ -296,6 +296,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     LONG_MENU_CREATE_HOTSPOT = 19,
     LONG_MENU_CREATE_CLIPPING = 20,
     LONG_MENU_LOOKUP_WORD = 21,
+    LONG_MENU_STICKY_NOTES = 22,
     LONG_PRESS_MENU_ACTION_COUNT
   };
 
@@ -450,6 +451,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   char dictionarySdFontFamilyName[64] = "";
   // Zero follows the active reader size.
   uint8_t dictionaryFontPointSize = 0;
+  // Dedicated Sticky Notes SD-card font. Empty keeps the built-in UI font.
+  char stickyNoteSdFontFamilyName[64] = "";
+  uint8_t stickyNoteFontPointSize = 12;
   // Show hidden files/directories (starting with '.') in the file browser (0 = hidden, 1 = show)
   uint8_t showHiddenFiles = 0;
   // Hide file extensions in the file browser right-side value column (0 = show, 1 = hide)

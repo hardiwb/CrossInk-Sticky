@@ -2,9 +2,11 @@
 
 ### Added
 
+- Sticky Notes can be assigned to the reader's long-press Menu action.
 - EPUB tables now lay out a row at a time in both Incremental and Full Section indexing, keeping regular tables readable without whole-table buffering.
 - Touch support for Seeed Studio Sticky
 - Nearby File Transfer can send EPUB, TXT, XTC, XTCH, PNG, and BMP files directly between two CrossInk devices without a Wi-Fi network.
+- Sticky Notes can receive a dated message from a BS-Pro over ESP-NOW and pin the rendered note as the custom sleep screen.
 - Recent Books and image-file long-press actions can send files directly to a nearby CrossInk device.
 - Dictionary lookup and lookup history
 - EPUB books can use a dedicated SD-card dictionary font while keeping a different reader font.
@@ -22,6 +24,7 @@
 
 ### Changed
 
+- Sticky Notes received from BS-Pro now display each to-do item as a separate checklist row with status and text columns, with dedicated font and font-size settings for the date and content.
 - Reader font sizes now persist as actual point sizes, keeping the closest matching size when font families or installed files change.
 - SD-card fonts now include the built-in reader fallback stack for common symbols, emoji, and selected CJK glyphs while retaining Noto Sans fallback coverage.
 - Downloadable SD-card fonts are now rendered with the same darker anti-aliasing as the built-in reading fonts.
@@ -49,6 +52,8 @@
 
 ### Fixed
 
+- Lyra Home navigation now includes feature-gated menu entries in its selection count, keeping Settings reachable when Sticky Notes is enabled.
+- Windows X3 builds no longer appear stuck while resolving dependencies when the project uses CRLF line endings or a non-UTF-8 console.
 - Book menu tab navigation, popup scrolling, customized Reading Stats hints, and short button presses after low-power mode now work reliably.
 - Sleep screens now honor the current orientation, avoid X4 transition flashes, fall back to a valid wallpaper when needed, and handle low-memory image decoding without rebooting.
 - Choosing Set Cover uses the selected image in place, and Home no longer repeatedly generates missing EPUB covers.

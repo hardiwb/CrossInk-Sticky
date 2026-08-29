@@ -402,6 +402,8 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   if (sdFontFamilyName[0] != '\0') doc["sdFontFamilyName"] = sdFontFamilyName;
   if (dictionarySdFontFamilyName[0] != '\0') doc["dictionaryFont"] = dictionarySdFontFamilyName;
   doc["dictionaryFontSize"] = dictionaryFontPointSize;
+  if (stickyNoteSdFontFamilyName[0] != '\0') doc["stickyNoteFont"] = stickyNoteSdFontFamilyName;
+  doc["stickyNoteFontSize"] = stickyNoteFontPointSize;
   doc["language"] = (language < getLanguageCount()) ? LANGUAGE_CODES[language] : "EN";
   doc["tiltPageTurnDirectionSchema"] = TILT_DIRECTION_SCHEMA_CURRENT;
   doc["clockDateHasBeenSynced"] = clockDateHasBeenSynced;
@@ -570,6 +572,10 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   strncpy(dictionarySdFontFamilyName, dictionaryFamily, sizeof(dictionarySdFontFamilyName) - 1);
   dictionarySdFontFamilyName[sizeof(dictionarySdFontFamilyName) - 1] = '\0';
   dictionaryFontPointSize = doc["dictionaryFontSize"] | static_cast<uint8_t>(0);
+  const char* stickyNoteFamily = doc["stickyNoteFont"] | "";
+  strncpy(stickyNoteSdFontFamilyName, stickyNoteFamily, sizeof(stickyNoteSdFontFamilyName) - 1);
+  stickyNoteSdFontFamilyName[sizeof(stickyNoteSdFontFamilyName) - 1] = '\0';
+  stickyNoteFontPointSize = doc["stickyNoteFontSize"] | static_cast<uint8_t>(12);
   if (storedFontFamily >= BUILTIN_FONT_COUNT) needsResave = true;
   if (doc["lineHeightPercent"].isNull() && !doc["lineSpacing"].isNull()) {
     const uint8_t legacySpacing =

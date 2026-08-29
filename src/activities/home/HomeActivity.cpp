@@ -36,13 +36,14 @@
 #include "components/themes/dashboard/DashboardTheme.h"
 #include "components/themes/lyra/LyraCarouselTheme.h"
 #include "components/themes/minimal/MinimalTheme.h"
+#include "features/sticky_notes/StickyNotesConfig.h"
 #include "fontIds.h"
 
 namespace {
 constexpr uint32_t CAROUSEL_CACHE_MAGIC = 0x43434152;  // "CCAR"
 // Cached frames include all Home visuals, including the menu icons. Bump this
 // whenever their rendering changes so stale snapshots are rebuilt after OTA.
-constexpr uint16_t CAROUSEL_CACHE_VERSION = 5;
+constexpr uint16_t CAROUSEL_CACHE_VERSION = CROSSINK_ENABLE_STICKY_NOTES ? 6 : 5;
 constexpr char CAROUSEL_CACHE_PATH[] = "/.crosspoint/home_carousel_cache.bin";
 constexpr char CAROUSEL_CACHE_TMP_PATH[] = "/.crosspoint/home_carousel_cache.tmp";
 constexpr uint32_t CAROUSEL_FRAME_MIN_FREE_AFTER_ALLOC = 64U * 1024U;
@@ -58,6 +59,9 @@ enum class HomeMenuAction {
   ReadingStats,
   Bookmarks,
   FileTransfer,
+#if CROSSINK_ENABLE_STICKY_NOTES
+  StickyNotes,
+#endif
   Settings,
 };
 
@@ -68,7 +72,7 @@ struct HomeMenuEntry {
 };
 
 struct HomeMenuEntries {
-  static constexpr int kCapacity = 8;
+  static constexpr int kCapacity = CROSSINK_ENABLE_STICKY_NOTES ? 9 : 8;
   std::array<HomeMenuEntry, kCapacity> entries{};
   int count = 0;
 
@@ -275,6 +279,9 @@ void appendHomeMenuItems(HomeMenuEntries& items, bool hasOpdsServers, bool hasRe
   }
 
   items.push({tr(STR_FILE_TRANSFER), Transfer, HomeMenuAction::FileTransfer});
+#if CROSSINK_ENABLE_STICKY_NOTES
+  items.push({tr(STR_STICKY_NOTES), Transfer, HomeMenuAction::StickyNotes});
+#endif
   items.push({tr(STR_SETTINGS_TITLE), Settings, HomeMenuAction::Settings});
 }
 
@@ -299,6 +306,9 @@ HomeMenuEntries buildMinimalMenuItems(bool hasOpdsServers, bool hasReadingStats,
   }
 
   items.push({tr(STR_FILE_TRANSFER), Transfer, HomeMenuAction::FileTransfer});
+#if CROSSINK_ENABLE_STICKY_NOTES
+  items.push({tr(STR_STICKY_NOTES), Transfer, HomeMenuAction::StickyNotes});
+#endif
   return items;
 }
 
@@ -593,7 +603,8 @@ static_assert(HomeActivity::kMaxCachedBooks >= LyraCarouselMetrics::values.homeR
 
 int HomeActivity::getMenuItemCount() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  int count = 4;  // File Browser, Recents, File transfer, Settings
+  int count = static_cast<int>(
+      buildHomeMenuItems(hasOpdsServers, hasReadingStats, hasBookmarks, hasClippings).size());
   if (!metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
     count += getVisibleRecentBookCount();
   } else if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
@@ -1448,6 +1459,11 @@ void HomeActivity::loop() {
           case HomeMenuAction::FileTransfer:
             onFileTransferOpen();
             break;
+#if CROSSINK_ENABLE_STICKY_NOTES
+          case HomeMenuAction::StickyNotes:
+            onStickyNotesOpen();
+            break;
+#endif
           case HomeMenuAction::ContinueReading:
           case HomeMenuAction::Settings:
             break;
@@ -1658,6 +1674,11 @@ void HomeActivity::loop() {
       case HomeMenuAction::FileTransfer:
         onFileTransferOpen();
         break;
+#if CROSSINK_ENABLE_STICKY_NOTES
+      case HomeMenuAction::StickyNotes:
+        onStickyNotesOpen();
+        break;
+#endif
       case HomeMenuAction::Settings:
         onSettingsOpen();
         break;
@@ -2116,6 +2137,10 @@ void HomeActivity::onRecentsOpen() { activityManager.goToRecentBooks(); }
 void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
+
+#if CROSSINK_ENABLE_STICKY_NOTES
+void HomeActivity::onStickyNotesOpen() { activityManager.goToStickyNotes(); }
+#endif
 
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
 

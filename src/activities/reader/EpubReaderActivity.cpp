@@ -54,6 +54,7 @@
 #include "activities/util/IntervalSelectionActivity.h"
 #include "clippings/ClippingsManager.h"
 #include "components/UITheme.h"
+#include "features/sticky_notes/StickyNotesConfig.h"
 #if CROSSINK_APP_CAP_TOUCH
 #include "components/TouchHeaderBackButton.h"
 #endif
@@ -4059,6 +4060,11 @@ void EpubReaderActivity::executeReaderQuickAction(CrossPointSettings::LONG_PRESS
         requestUpdate();
       }
       break;
+#if CROSSINK_ENABLE_STICKY_NOTES
+    case CrossPointSettings::LONG_MENU_STICKY_NOTES:
+      activityManager.goToStickyNotes();
+      break;
+#endif
     case CrossPointSettings::LONG_MENU_OFF:
     default:
       break;

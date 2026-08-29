@@ -8,6 +8,7 @@
 #include "activities/Activity.h"
 #include "activities/reader/BookReadingStats.h"
 #include "activities/reader/GlobalReadingStats.h"
+#include "features/sticky_notes/StickyNotesConfig.h"
 #include "util/ButtonNavigator.h"
 
 struct RecentBook;
@@ -81,6 +82,9 @@ class HomeActivity final : public Activity {
   void onRecentsOpen();
   void onSettingsOpen();
   void onFileTransferOpen();
+#if CROSSINK_ENABLE_STICKY_NOTES
+  void onStickyNotesOpen();
+#endif
   void onOpdsBrowserOpen();
   void onReadingStatsOpen();
   void onSavedItemsOpen();

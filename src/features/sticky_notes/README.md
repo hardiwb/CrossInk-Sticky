@@ -1,0 +1,42 @@
+# Sticky Notes extension
+
+This folder contains the optional, receive-only Sticky Notes extension. It is
+kept separate from the reader activities so a personal fork can carry or drop
+the feature with minimal merge conflicts. Define
+`CROSSINK_ENABLE_STICKY_NOTES=0` in the PlatformIO build flags to remove its
+menu entry and activity.
+
+The receiver is intentionally manual. Opening **Menu > Sticky Notes > Receive
+Note** starts Wi-Fi station mode and ESP-NOW on channel 1 for 60 seconds. The
+normal deep-sleep path is unchanged and never listens for notes.
+
+## BS-Pro sender packet
+
+Send one unencrypted ESP-NOW packet on Wi-Fi channel 1. All multi-byte values
+are little-endian.
+
+| Offset | Bytes | Value |
+| ---: | ---: | --- |
+| 0 | 4 | ASCII `CINT` |
+| 4 | 1 | Protocol version: `1` |
+| 5 | 1 | Packet type: `1` (note) |
+| 6 | 1 | Reserved: `0` |
+| 7 | 1 | UTF-8 message length, 1-220 bytes |
+| 8 | 4 | Non-zero sender sequence number |
+| 12 | 2 | Year, 2024-2099 |
+| 14 | 1 | Month, 1-12 |
+| 15 | 1 | Day, valid for the month |
+| 16 | N | UTF-8 message bytes, without a trailing NUL |
+
+The Xteink validates the whole packet before changing storage. Newlines and
+tabs are rendered as spaces. After a successful render and settings save, it
+sends a 16-byte acknowledgement to the source MAC using the same header:
+packet type `2` at offset 5 and the received sequence number at offset 8.
+
+The sender should transmit every 250-500 ms until it receives the matching
+acknowledgement or its own timeout expires. Increment the sequence number for
+each new note.
+
+The generated 1-bit bitmap is installed atomically at
+`/.sleep/sticky-note.bmp`, selected as the favorite custom sleep image, and
+picked up by the firmware's existing sleep-screen scanner on the next sleep.

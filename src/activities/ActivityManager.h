@@ -12,6 +12,7 @@
 
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
+#include "features/sticky_notes/StickyNotesConfig.h"
 #include "util/ScreenshotInfo.h"
 
 #ifndef portMUX_INITIALIZER_UNLOCKED
@@ -101,6 +102,9 @@ class ActivityManager {
   void goToNearbyStatsSync();
   void goToNearbyBookSend(std::string path, bool returnToReader);
   void goToNearbyBookReceive();
+#if CROSSINK_ENABLE_STICKY_NOTES
+  void goToStickyNotes();
+#endif
   void goToSettings(bool dismissOnUpSwipe = false);
   void goToFileBrowser(std::string path = {});
   void goToRecentBooks();
