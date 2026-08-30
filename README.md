@@ -16,7 +16,7 @@ The main goal of this fork is to add a small productivity layer to CrossInk with
 ### Sticky Notes
 
 <p align="center">
-  <img src="./docs/images/StickynotesCrossink.jpeg" alt="Sticky Notes on CrossInk" width="400">
+  <img src="./docs/images/StickynotesCrossink.jpeg" alt="Sticky Notes on CrossInk" width="300">
 </p>
 
 - Added **Sticky Notes** support to Xteink X3/X4.
