@@ -17,6 +17,7 @@ Welcome to CrossInk, a personal fork of CrossPoint Reader.
 - [Reader Features](./reader-features.md)
 - [Dictionary](./dictionary.md)
 - [Controls](./controls.md)
+- [Sticky Notes ESP-NOW Sender Protocol](./sticky-notes-esp-now-sender.md)
 - [Reading Stats Sync](./reading-stats-sync.md)
 - [Nearby File Transfer](./nearby-file-transfer.md)
 - [Nearby Position Sync](./nearby-position-sync.md)
