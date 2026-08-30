@@ -3,6 +3,7 @@
 #if CROSSINK_ENABLE_STICKY_NOTES
 
 #include <GfxRenderer.h>
+#include <FontCacheManager.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -10,6 +11,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
+#include <string>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -30,6 +32,11 @@ constexpr const char* WEEKDAY_NAMES[] = {"Sunday", "Monday", "Tuesday", "Wednesd
 constexpr const char* MONTH_NAMES[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
+int builtInNoteFontId(const uint8_t pointSize) {
+  if (pointSize <= 10) return UI_10_FONT_ID;
+  return UI_12_FONT_ID;
+}
+
 void formatNoteDate(const sticky_note::Note& note, char* output, const size_t outputSize) {
   std::tm date{};
   date.tm_year = static_cast<int>(note.year) - 1900;
@@ -44,10 +51,12 @@ void formatNoteDate(const sticky_note::Note& note, char* output, const size_t ou
 }
 }  // namespace
 
-StickyNotesActivity::StickyNotesActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
+StickyNotesActivity::StickyNotesActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                         const bool returnToReader)
     : Activity("StickyNotes", renderer, mappedInput),
       uiTarget_(makeUiTarget(renderer)),
-      app_(uiTarget_, uiTarget_.deviceContext())
+      app_(uiTarget_, uiTarget_.deviceContext()),
+      returnToReader_(returnToReader)
 #ifndef SIMULATOR
       ,
       pendingMutex_(xSemaphoreCreateMutex())
@@ -70,13 +79,18 @@ void StickyNotesActivity::onEnter() {
   app_.setTheme(uiThemeTokens(uiTarget_));
   app_.on(ACTION_RECEIVE, &StickyNotesActivity::onRowEvent, this);
   app_.setScreen(&StickyNotesActivity::menuScreen, this);
-  setState(State::Ready);
+  startReceiving();
 }
 
 void StickyNotesActivity::onExit() {
   Activity::onExit();
   stopReceiving();
-  if (radioUsed_) silentRestart();
+  if (radioUsed_) {
+    if (returnToReader_)
+      silentRestartToReader();
+    else
+      silentRestart();
+  }
 }
 
 void StickyNotesActivity::loop() {
@@ -206,11 +220,11 @@ void StickyNotesActivity::processPendingNote() {
   if (!hasPending) return;
 
   note_ = pendingNote;
-  noteFontId_ = UI_12_FONT_ID;
+  noteFontId_ = builtInNoteFontId(SETTINGS.stickyNoteFontPointSize);
   if (SETTINGS.stickyNoteSdFontFamilyName[0] != '\0') {
     const auto activation = sdFontSystem.activateDictionaryFont(renderer, SETTINGS.stickyNoteSdFontFamilyName,
                                                                 SETTINGS.stickyNoteFontPointSize);
-    if (activation.fontId != 0) noteFontId_ = activation.fontId;
+    if (activation.usingDictionaryFont && activation.fontId != 0) noteFontId_ = activation.fontId;
     sdFontSystem.releaseRegistry();
   }
   setState(State::Applying);
@@ -223,7 +237,7 @@ void StickyNotesActivity::processPendingNote() {
   delay(30);
   stopReceiving();
   if (!ackQueued) LOG_ERR(LOG_TAG, "Note saved but ACK could not be queued");
-  setState(State::Saved);
+  exitActivity();
 #endif
 }
 
@@ -241,7 +255,10 @@ void StickyNotesActivity::setError(const StrId errorId) {
 
 void StickyNotesActivity::exitActivity() {
   mappedInput.suppressNextBackRelease();
-  finish();
+  if (returnToReader_ && !APP_STATE.openEpubPath.empty())
+    onSelectBook(APP_STATE.openEpubPath);
+  else
+    finish();
 }
 
 void StickyNotesActivity::drawStatusScreen(const char* status, const bool showReceiveAction) {
@@ -283,6 +300,18 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
   renderer.drawLine(left, firstRuleY, right, firstRuleY, 2, true);
   char dateLine[40];
   formatNoteDate(note_, dateLine, sizeof(dateLine));
+  const auto noteStyle = SETTINGS.stickyNoteBold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+  if (renderer.isSdCardFont(noteFontId_)) {
+    std::string noteGlyphs(dateLine);
+    noteGlyphs.push_back('\n');
+    noteGlyphs.append(note_.message.data());
+    auto* fontCache = renderer.getFontCacheManager();
+    const uint8_t styleMask = noteStyle == EpdFontFamily::BOLD ? 0x03 : 0x01;
+    if (!fontCache || !fontCache->prewarmCache(noteFontId_, noteGlyphs.c_str(), styleMask)) {
+      LOG_ERR(LOG_TAG, "Failed to prepare Sticky Notes SD font; using built-in font");
+      noteFontId_ = builtInNoteFontId(SETTINGS.stickyNoteFontPointSize);
+    }
+  }
   const int dateY = firstRuleY + 16;
   UITheme::drawCenteredText(renderer, safeArea, noteFontId_, dateY, dateLine);
 
@@ -292,27 +321,35 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
   const int messageTop = secondRuleY + 22;
   const int messageBottom = safeArea.y + safeArea.height - footerReserve;
   const int lineHeight = renderer.getLineHeight(noteFontId_) + 5;
-
-  const int textLeft = left;
-  const int textWidth = std::max(1, right - textLeft + 1);
-  int textY = messageTop;
+  constexpr int cardPaddingX = 12;
+  constexpr int cardPaddingY = 8;
+  constexpr int cardGap = 8;
+  constexpr int cardRadius = 10;
+  const int cardLeft = left;
+  const int cardWidth = std::max(1, right - cardLeft + 1);
+  const int textLeft = cardLeft + cardPaddingX;
+  const int textWidth = std::max(1, cardWidth - cardPaddingX * 2);
+  int cardY = messageTop;
   char* row = note_.message.data();
 
-  while (row && *row && textY + lineHeight <= messageBottom) {
+  while (row && *row && cardY + cardPaddingY * 2 + lineHeight <= messageBottom) {
     char* newline = strchr(row, '\n');
     if (newline) *newline = '\0';
-    const int remainingLines = std::max(1, (messageBottom - textY) / lineHeight);
-    const auto lines = renderer.wrappedText(noteFontId_, row, textWidth, remainingLines);
+    const int remainingLines = std::max(1, (messageBottom - cardY - cardPaddingY * 2) / lineHeight);
+    const auto lines = renderer.wrappedText(noteFontId_, row, textWidth, remainingLines, noteStyle);
+    const int cardHeight = cardPaddingY * 2 + static_cast<int>(lines.size()) * lineHeight;
+    renderer.fillRoundedRect(cardLeft, cardY, cardWidth, cardHeight, cardRadius, Color::LightGray);
+
+    int textY = cardY + cardPaddingY;
     for (const auto& line : lines) {
-      if (textY + lineHeight > messageBottom) break;
-      renderer.drawText(noteFontId_, textLeft, textY, line.c_str());
+      renderer.drawText(noteFontId_, textLeft, textY, line.c_str(), true, noteStyle);
       textY += lineHeight;
     }
 
     if (newline) {
       *newline = '\n';
       row = newline + 1;
-      textY += 4;
+      cardY += cardHeight + cardGap;
     } else {
       break;
     }

@@ -6,11 +6,20 @@ the feature with minimal merge conflicts. Define
 `CROSSINK_ENABLE_STICKY_NOTES=0` in the PlatformIO build flags to remove its
 menu entry and activity.
 
-The receiver is intentionally manual. Opening **Menu > Sticky Notes > Receive
-Note** starts Wi-Fi station mode and ESP-NOW on channel 1 for 60 seconds. The
-normal deep-sleep path is unchanged and never listens for notes.
+The complete list of fork-owned files, upstream integration points, persistent
+settings, and update procedure is maintained in the
+[fork delta guide](../../../docs/crossink-sticky-fork-delta.md).
 
-## BS-Pro sender packet
+Opening **Menu > Sticky Notes** immediately starts Wi-Fi station mode and
+ESP-NOW on channel 1 for 60 seconds. The normal deep-sleep path is unchanged and
+never listens for notes. If listening times out, select **Receive Note** to try
+again.
+
+## Sender protocol
+
+Any ESP32 firmware can act as the sender; BrokenSignal-Pro is not required. See
+the [standalone sender protocol guide](../../../docs/sticky-notes-esp-now-sender.md)
+for the checklist text format, packet and ACK layouts, and retry behavior.
 
 Send one unencrypted ESP-NOW packet on Wi-Fi channel 1. All multi-byte values
 are little-endian.
@@ -28,9 +37,10 @@ are little-endian.
 | 15 | 1 | Day, valid for the month |
 | 16 | N | UTF-8 message bytes, without a trailing NUL |
 
-The Xteink validates the whole packet before changing storage. Newlines and
-tabs are rendered as spaces. After a successful render and settings save, it
-sends a 16-byte acknowledgement to the source MAC using the same header:
+The Xteink validates the whole packet before changing storage. Line feeds split
+checklist rows; carriage returns and tabs are rendered as spaces. After a
+successful render and settings save, it sends a 16-byte acknowledgement to the
+source MAC using the same header:
 packet type `2` at offset 5 and the received sequence number at offset 8.
 
 The sender should transmit every 250-500 ms until it receives the matching

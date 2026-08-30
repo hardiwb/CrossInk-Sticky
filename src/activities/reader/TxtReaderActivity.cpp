@@ -345,6 +345,11 @@ bool TxtReaderActivity::executePowerButtonAction() {
       case CrossPointSettings::SHORT_PWRBTN::FILE_BROWSER:
         activityManager.goToFileBrowser(txt ? txt->getPath() : "");
         return true;
+#if CROSSINK_ENABLE_STICKY_NOTES
+      case CrossPointSettings::SHORT_PWRBTN::STICKY_NOTES:
+        activityManager.goToStickyNotes();
+        return true;
+#endif
       case CrossPointSettings::SHORT_PWRBTN::CREATE_CLIPPING:
         return false;
       default:

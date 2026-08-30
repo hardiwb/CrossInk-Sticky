@@ -229,6 +229,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     CREATE_HOTSPOT = 20,
     CREATE_CLIPPING = 21,
     LOOKUP_WORD = 22,
+    STICKY_NOTES = 23,
     SHORT_PWRBTN_COUNT
   };
 
@@ -454,6 +455,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Dedicated Sticky Notes SD-card font. Empty keeps the built-in UI font.
   char stickyNoteSdFontFamilyName[64] = "";
   uint8_t stickyNoteFontPointSize = 12;
+  uint8_t stickyNoteBold = 1;
   // Show hidden files/directories (starting with '.') in the file browser (0 = hidden, 1 = show)
   uint8_t showHiddenFiles = 0;
   // Hide file extensions in the file browser right-side value column (0 = show, 1 = hide)

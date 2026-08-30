@@ -4199,6 +4199,11 @@ bool EpubReaderActivity::executeShortPowerButtonAction() {
       mappedInput.suppressNextPowerConfirmRelease();
       executeReaderQuickAction(CrossPointSettings::LONG_MENU_LOOKUP_WORD);
       return true;
+#if CROSSINK_ENABLE_STICKY_NOTES
+    case CrossPointSettings::SHORT_PWRBTN::STICKY_NOTES:
+      executeReaderQuickAction(CrossPointSettings::LONG_MENU_STICKY_NOTES);
+      return true;
+#endif
     default:
       return false;
   }
@@ -4296,6 +4301,11 @@ bool EpubReaderActivity::executeLongPowerButtonAction() {
       mappedInput.suppressNextPowerConfirmRelease();
       executeReaderQuickAction(CrossPointSettings::LONG_MENU_LOOKUP_WORD);
       return true;
+#if CROSSINK_ENABLE_STICKY_NOTES
+    case CrossPointSettings::SHORT_PWRBTN::STICKY_NOTES:
+      executeReaderQuickAction(CrossPointSettings::LONG_MENU_STICKY_NOTES);
+      return true;
+#endif
     default:
       return false;
   }

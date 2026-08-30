@@ -22,6 +22,11 @@
 
 inline std::string fontSizePointLabel(const uint8_t pointSize) { return std::to_string(pointSize) + " pt"; }
 
+inline uint8_t closestStickyNoteBuiltinPointSize(const uint8_t pointSize) {
+  if (pointSize <= 11) return 10;
+  return 12;
+}
+
 inline void appendBuiltinFontSizeOption(SettingInfo& setting, const CrossPointSettings::FONT_SIZE size) {
   const uint8_t pointSize = CrossPointSettings::getReaderFontPointSize(size);
   setting.enumStringValues.push_back(fontSizePointLabel(pointSize));
@@ -324,7 +329,7 @@ inline SettingInfo buildStickyNoteFontFamilySetting(const SdCardFontRegistry* re
   s.valueSetter = [familyNames, familySizes](const uint8_t value) {
     if (value == 0 || value > familyNames.size()) {
       SETTINGS.stickyNoteSdFontFamilyName[0] = '\0';
-      SETTINGS.stickyNoteFontPointSize = 12;
+      SETTINGS.stickyNoteFontPointSize = closestStickyNoteBuiltinPointSize(SETTINGS.stickyNoteFontPointSize);
       return;
     }
     strncpy(SETTINGS.stickyNoteSdFontFamilyName, familyNames[value - 1].c_str(),
@@ -347,8 +352,10 @@ inline SettingInfo buildStickyNoteFontSizeSetting(const SdCardFontRegistry* regi
   s.category = StrId::STR_CAT_READER;
 
   if (!registry || SETTINGS.stickyNoteSdFontFamilyName[0] == '\0') {
-    s.enumStringValues.push_back(I18N.get(StrId::STR_DEFAULT_VALUE));
-    s.enumRawValues.push_back(12);
+    for (const uint8_t pointSize : {10, 12}) {
+      s.enumStringValues.push_back(fontSizePointLabel(pointSize));
+      s.enumRawValues.push_back(pointSize);
+    }
     return s;
   }
   const auto* family = registry->findFamily(SETTINGS.stickyNoteSdFontFamilyName);
@@ -365,6 +372,11 @@ inline SettingInfo buildStickyNoteFontSizeSetting(const SdCardFontRegistry* regi
     s.enumRawValues.push_back(pointSize);
   }
   return s;
+}
+
+inline SettingInfo buildStickyNoteBoldSetting() {
+  return SettingInfo::Toggle(StrId::STR_STICKY_NOTE_BOLD, &CrossPointSettings::stickyNoteBold, "stickyNoteBold",
+                             StrId::STR_CAT_READER);
 }
 
 inline SettingInfo buildDictionarySetting(const DictionaryRegistry* dictRegistry) {
@@ -646,7 +658,11 @@ inline const std::vector<SettingInfo>& getBaseSettingsList() {
                            StrId::STR_FOOTNOTES,
                            StrId::STR_BROWSE_FILES,
                            StrId::STR_SAVE_CLIPPING,
-                           StrId::STR_LOOKUP},
+                           StrId::STR_LOOKUP,
+#if CROSSINK_ENABLE_STICKY_NOTES
+                           StrId::STR_STICKY_NOTES,
+#endif
+                          },
                           "longPwrBtn", StrId::STR_CAT_CONTROLS)
             .withEnumRawValues({CrossPointSettings::IGNORE,
                                 CrossPointSettings::SLEEP,
@@ -669,7 +685,11 @@ inline const std::vector<SettingInfo>& getBaseSettingsList() {
                                 CrossPointSettings::FOOTNOTES,
                                 CrossPointSettings::FILE_BROWSER,
                                 CrossPointSettings::CREATE_CLIPPING,
-                                CrossPointSettings::LOOKUP_WORD}));
+                                CrossPointSettings::LOOKUP_WORD,
+#if CROSSINK_ENABLE_STICKY_NOTES
+                                CrossPointSettings::STICKY_NOTES,
+#endif
+                               }));
     add(SettingInfo::Enum(StrId::STR_LONG_PRESS_MENU_ACTION, &CrossPointSettings::longPressMenuAction,
                           {StrId::STR_IGNORE,
                            StrId::STR_SLEEP,
@@ -996,6 +1016,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         fontSizeIt == v.end() ? v.size() : static_cast<size_t>(std::distance(v.begin(), fontSizeIt) + 1);
     v.insert(v.begin() + insertIndex, buildStickyNoteFontFamilySetting(registry));
     v.insert(v.begin() + insertIndex + 1, buildStickyNoteFontSizeSetting(registry));
+    v.insert(v.begin() + insertIndex + 2, buildStickyNoteBoldSetting());
   }
   if (dictRegistry) {
     if (dictRegistry->count() > 0) {
@@ -1031,6 +1052,7 @@ inline std::vector<SettingInfo> buildGroupedReaderSettingsList(const std::vector
   addReaderSetting(StrId::STR_FONT_SIZE);
   addReaderSetting(StrId::STR_STICKY_NOTE_FONT);
   addReaderSetting(StrId::STR_STICKY_NOTE_FONT_SIZE);
+  addReaderSetting(StrId::STR_STICKY_NOTE_BOLD);
   addReaderSetting(StrId::STR_DICTIONARY_FONT);
   addReaderSetting(StrId::STR_DICTIONARY_FONT_SIZE);
   readerSettings.push_back(SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
@@ -1106,6 +1128,7 @@ inline std::vector<SettingInfo> buildReaderFontSettingsList(const std::vector<Se
   addSettingByName(settings, allSettings, StrId::STR_FONT_SIZE);
   addSettingByName(settings, allSettings, StrId::STR_STICKY_NOTE_FONT);
   addSettingByName(settings, allSettings, StrId::STR_STICKY_NOTE_FONT_SIZE);
+  addSettingByName(settings, allSettings, StrId::STR_STICKY_NOTE_BOLD);
   addSettingByName(settings, allSettings, StrId::STR_DICTIONARY_FONT);
   addSettingByName(settings, allSettings, StrId::STR_DICTIONARY_FONT_SIZE);
   addSettingByName(settings, allSettings, StrId::STR_LINE_SPACING);

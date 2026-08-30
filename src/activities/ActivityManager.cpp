@@ -293,7 +293,7 @@ void ActivityManager::goToNearbyBookReceive() {
 
 #if CROSSINK_ENABLE_STICKY_NOTES
 void ActivityManager::goToStickyNotes() {
-  auto activity = makeUniqueNoThrow<StickyNotesActivity>(renderer, mappedInput);
+  auto activity = makeUniqueNoThrow<StickyNotesActivity>(renderer, mappedInput, isReaderActivity());
   if (!activity) {
     LOG_ERR("ACT", "OOM: sticky notes receiver");
     return;

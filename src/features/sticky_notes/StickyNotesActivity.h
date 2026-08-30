@@ -24,7 +24,7 @@
 
 class StickyNotesActivity final : public Activity {
  public:
-  StickyNotesActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
+  StickyNotesActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool returnToReader);
   ~StickyNotesActivity() override;
 
   void onEnter() override;
@@ -55,6 +55,7 @@ class StickyNotesActivity final : public Activity {
   int noteFontId_ = 0;
   uint32_t listeningStartedMs_ = 0;
   bool radioUsed_ = false;
+  bool returnToReader_ = false;
 
 #ifndef SIMULATOR
   HalEspNow radio_;
