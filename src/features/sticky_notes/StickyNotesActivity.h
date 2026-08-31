@@ -9,6 +9,7 @@
 
 #include <array>
 #include <atomic>
+#include <memory>
 
 #include <I18n.h>
 
@@ -51,7 +52,11 @@ class StickyNotesActivity final : public Activity {
   ScreenTransitionRefresh screenTransitionRefresh_;
   State state_ = State::Ready;
   StrId errorId_ = StrId::STR_STICKY_NOTE_INVALID;
+  // One 2 KB buffer in the fallibly allocated activity, not on the task stack.
   sticky_note::Note note_;
+  // Optional SD-font prewarm scratch, allocated once in onEnter and reused.
+  std::unique_ptr<char[]> noteGlyphs_;
+  static constexpr size_t NOTE_GLYPH_BYTES = sticky_note::MAX_MESSAGE_BYTES + 42;
   int noteFontId_ = 0;
   uint32_t listeningStartedMs_ = 0;
   bool radioUsed_ = false;
@@ -60,9 +65,13 @@ class StickyNotesActivity final : public Activity {
 #ifndef SIMULATOR
   HalEspNow radio_;
   SemaphoreHandle_t pendingMutex_ = nullptr;
-  sticky_note::Note pendingNote_;
+  sticky_note::Reassembler assembly_;
+  std::array<uint8_t, sticky_note::MAX_PACKET_BYTES> pendingPacket_{};
+  size_t pendingLength_ = 0;
   std::array<uint8_t, 6> pendingSourceMac_{};
   bool pending_ = false;
+  uint32_t savedAtMs_ = 0;
+  uint32_t lastAckMs_ = 0;
 #endif
 
   static void menuScreen(UiApp::ScreenType& screen, void* user);

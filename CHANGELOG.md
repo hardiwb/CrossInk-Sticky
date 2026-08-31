@@ -1,3 +1,13 @@
+## [Unreleased]
+
+### Added
+
+- Sticky Notes receives up to 2 KB of dated checklist text using numbered ESP-NOW chunks, whole-message validation, and retry-safe acknowledgements. Existing 220-byte senders remain compatible.
+
+### Changed
+
+- Larger sticky notes use tighter card spacing, with a More indicator when additional rows do not fit the single sleep screen.
+
 ## [v1.5.0] - 2026-08-08
 
 ### Added

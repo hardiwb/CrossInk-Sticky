@@ -21,8 +21,10 @@ Any ESP32 firmware can act as the sender; BrokenSignal-Pro is not required. See
 the [standalone sender protocol guide](../../../docs/sticky-notes-esp-now-sender.md)
 for the checklist text format, packet and ACK layouts, and retry behavior.
 
-Send one unencrypted ESP-NOW packet on Wi-Fi channel 1. All multi-byte values
-are little-endian.
+Send unencrypted ESP-NOW on Wi-Fi channel 1. All multi-byte values are
+little-endian. The table below is the legacy v1 format for notes up to 220 bytes.
+Updated senders can transfer up to 2048 bytes using v2 numbered chunks; see the
+standalone guide above for the 24-byte header, CRC, and retry contract.
 
 | Offset | Bytes | Value |
 | ---: | ---: | --- |
@@ -46,6 +48,21 @@ packet type `2` at offset 5 and the received sequence number at offset 8.
 The sender should transmit every 250-500 ms until it receives the matching
 acknowledgement or its own timeout expires. Increment the sequence number for
 each new note.
+
+For v2, repeat the complete chunk sequence at 100 ms intervals until the final
+save ACK (version 2), with a 30-second sender timeout. The receiver does not
+touch the old image until all chunks pass date, size, CRC and UTF-8 checks.
+The activity holds one 2060-byte Note and small assembly metadata, replacing
+the previous pair of 232-byte Note members and avoiding full-message locals.
+The receiver repeats final ACKs for two seconds so packet loss does not force
+another render/save. Original v1 senders still work.
+SD-card fonts use an optional 2090-byte prewarm scratch allocation for the
+activity lifetime, replacing a growing render-time string. Allocation failure
+falls back to the built-in font; no second framebuffer is allocated.
+
+The output remains one image. Long transfers use compact card spacing and a
+More indicator for remaining rows; wrapped row text can still be ellipsized.
+Only the rendered image is persisted, not a paginated/full-text notebook.
 
 The generated 1-bit bitmap is installed atomically at
 `/.sleep/sticky-note.bmp`, selected as the favorite custom sleep image, and

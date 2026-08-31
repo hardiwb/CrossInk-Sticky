@@ -7,11 +7,11 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
-#include <string>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -75,6 +75,13 @@ StickyNotesActivity::~StickyNotesActivity() {
 
 void StickyNotesActivity::onEnter() {
   Activity::onEnter();
+  if (SETTINGS.stickyNoteSdFontFamilyName[0] != '\0') {
+    // At most 2090 bytes for text + date; too large for the C3 task stack.
+    // Activity-owned scratch avoids growing a temporary string during render.
+    noteGlyphs_ = makeUniqueNoThrow<char[]>(NOTE_GLYPH_BYTES);
+    if (!noteGlyphs_) LOG_ERR(LOG_TAG, "Cannot allocate %u font scratch bytes; using built-in font",
+                            static_cast<unsigned>(NOTE_GLYPH_BYTES));
+  }
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
   app_.setTheme(uiThemeTokens(uiTarget_));
   app_.on(ACTION_RECEIVE, &StickyNotesActivity::onRowEvent, this);
@@ -85,6 +92,7 @@ void StickyNotesActivity::onEnter() {
 void StickyNotesActivity::onExit() {
   Activity::onExit();
   stopReceiving();
+  noteGlyphs_.reset();
   if (radioUsed_) {
     if (returnToReader_)
       silentRestartToReader();
@@ -94,6 +102,23 @@ void StickyNotesActivity::onExit() {
 }
 
 void StickyNotesActivity::loop() {
+#ifndef SIMULATOR
+  // Repeat the final acknowledgement briefly: a lost ACK must not cause a
+  // second render/save, or make the sender report failure after a good save.
+  if (state_ == State::Saved) {
+    const uint32_t now = millis();
+    if (now - savedAtMs_ >= 2000) {
+      stopReceiving();
+      exitActivity();
+      return;
+    }
+    if (now - lastAckMs_ >= 350) {
+      lastAckMs_ = now;
+      sendAck(assembly_.source(), note_.sequence);
+    }
+    return;
+  }
+#endif
   processPendingNote();
 
   if (TouchHeaderBackButton::wasTapped(mappedInput, renderer) ||
@@ -187,6 +212,8 @@ void StickyNotesActivity::startReceiving() {
   }
   xSemaphoreTake(pendingMutex_, portMAX_DELAY);
   pending_ = false;
+  pendingLength_ = 0;
+  assembly_.reset();
   xSemaphoreGive(pendingMutex_);
   if (!radio_.begin(ESPNOW_CHANNEL, &StickyNotesActivity::onReceive, this)) {
     setError(StrId::STR_STICKY_NOTE_RADIO_FAILED);
@@ -205,23 +232,22 @@ void StickyNotesActivity::stopReceiving() {
 
 void StickyNotesActivity::processPendingNote() {
 #ifndef SIMULATOR
-  if (!pendingMutex_) return;
-  sticky_note::Note pendingNote;
-  std::array<uint8_t, 6> sourceMac{};
-  bool hasPending = false;
+  if (!pendingMutex_ || state_ != State::Listening) return;
+  sticky_note::ReceiveResult result = sticky_note::ReceiveResult::Rejected;
   xSemaphoreTake(pendingMutex_, portMAX_DELAY);
   if (pending_) {
-    pendingNote = pendingNote_;
-    sourceMac = pendingSourceMac_;
+    result = assembly_.accept(pendingSourceMac_.data(), pendingPacket_.data(), pendingLength_, millis(), note_);
     pending_ = false;
-    hasPending = true;
   }
   xSemaphoreGive(pendingMutex_);
-  if (!hasPending) return;
+  if (result != sticky_note::ReceiveResult::Complete) return;
 
-  note_ = pendingNote;
+  LOG_INF(LOG_TAG, "Received %u bytes in %u packet(s), protocol v%u",
+          static_cast<unsigned>(note_.messageLength),
+          static_cast<unsigned>(sticky_note::chunkCount(note_.messageLength)),
+          static_cast<unsigned>(assembly_.version()));
   noteFontId_ = builtInNoteFontId(SETTINGS.stickyNoteFontPointSize);
-  if (SETTINGS.stickyNoteSdFontFamilyName[0] != '\0') {
+  if (noteGlyphs_ && SETTINGS.stickyNoteSdFontFamilyName[0] != '\0') {
     const auto activation = sdFontSystem.activateDictionaryFont(renderer, SETTINGS.stickyNoteSdFontFamilyName,
                                                                 SETTINGS.stickyNoteFontPointSize);
     if (activation.usingDictionaryFont && activation.fontId != 0) noteFontId_ = activation.fontId;
@@ -233,11 +259,10 @@ void StickyNotesActivity::processPendingNote() {
     return;
   }
 
-  const bool ackQueued = sendAck(sourceMac.data(), note_.sequence);
-  delay(30);
-  stopReceiving();
+  const bool ackQueued = sendAck(assembly_.source(), note_.sequence);
   if (!ackQueued) LOG_ERR(LOG_TAG, "Note saved but ACK could not be queued");
-  exitActivity();
+  savedAtMs_ = lastAckMs_ = millis();
+  state_ = State::Saved;
 #endif
 }
 
@@ -302,12 +327,10 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
   formatNoteDate(note_, dateLine, sizeof(dateLine));
   const auto noteStyle = SETTINGS.stickyNoteBold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
   if (renderer.isSdCardFont(noteFontId_)) {
-    std::string noteGlyphs(dateLine);
-    noteGlyphs.push_back('\n');
-    noteGlyphs.append(note_.message.data());
+    if (noteGlyphs_) snprintf(noteGlyphs_.get(), NOTE_GLYPH_BYTES, "%s\n%s", dateLine, note_.message.data());
     auto* fontCache = renderer.getFontCacheManager();
     const uint8_t styleMask = noteStyle == EpdFontFamily::BOLD ? 0x03 : 0x01;
-    if (!fontCache || !fontCache->prewarmCache(noteFontId_, noteGlyphs.c_str(), styleMask)) {
+    if (!noteGlyphs_ || !fontCache || !fontCache->prewarmCache(noteFontId_, noteGlyphs_.get(), styleMask)) {
       LOG_ERR(LOG_TAG, "Failed to prepare Sticky Notes SD font; using built-in font");
       noteFontId_ = builtInNoteFontId(SETTINGS.stickyNoteFontPointSize);
     }
@@ -317,13 +340,14 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
 
   const int secondRuleY = dateY + renderer.getLineHeight(noteFontId_) + 14;
   renderer.drawLine(left, secondRuleY, right, secondRuleY, 2, true);
-  const int footerReserve = showSavedStatus ? renderer.getLineHeight(SMALL_FONT_ID) + 20 : 0;
+  const bool largeNote = note_.messageLength > sticky_note::CHUNK_BYTES;
+  const int footerReserve = showSavedStatus || largeNote ? renderer.getLineHeight(SMALL_FONT_ID) + 20 : 0;
   const int messageTop = secondRuleY + 22;
   const int messageBottom = safeArea.y + safeArea.height - footerReserve;
-  const int lineHeight = renderer.getLineHeight(noteFontId_) + 5;
+  const int lineHeight = renderer.getLineHeight(noteFontId_) + (largeNote ? 2 : 5);
   constexpr int cardPaddingX = 12;
-  constexpr int cardPaddingY = 8;
-  constexpr int cardGap = 8;
+  const int cardPaddingY = largeNote ? 4 : 8;
+  const int cardGap = largeNote ? 3 : 8;
   constexpr int cardRadius = 10;
   const int cardLeft = left;
   const int cardWidth = std::max(1, right - cardLeft + 1);
@@ -351,11 +375,16 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
       row = newline + 1;
       cardY += cardHeight + cardGap;
     } else {
+      row = nullptr;
       break;
     }
   }
 
-  if (showSavedStatus) {
+  if (largeNote && row && *row) {
+    UITheme::drawCenteredText(renderer, safeArea, SMALL_FONT_ID,
+                             safeArea.y + safeArea.height - renderer.getLineHeight(SMALL_FONT_ID) - 4,
+                             tr(STR_MORE));
+  } else if (showSavedStatus) {
     UITheme::drawCenteredText(renderer, safeArea, SMALL_FONT_ID,
                               safeArea.y + safeArea.height - renderer.getLineHeight(SMALL_FONT_ID) - 4,
                               tr(STR_STICKY_NOTE_SAVED));
@@ -412,18 +441,22 @@ void StickyNotesActivity::onReceive(const uint8_t* sourceMac, const uint8_t* dat
 }
 
 void StickyNotesActivity::enqueueNote(const uint8_t* sourceMac, const uint8_t* data, const int length) {
-  if (!pendingMutex_ || !sourceMac || length <= 0) return;
-  sticky_note::Note parsed;
-  if (!sticky_note::parseNote(data, static_cast<size_t>(length), parsed)) return;
+  if (!pendingMutex_ || !sourceMac || !data || length <= 0 ||
+      static_cast<size_t>(length) > pendingPacket_.size()) return;
   if (xSemaphoreTake(pendingMutex_, 0) != pdTRUE) return;
-  pendingNote_ = parsed;
-  std::copy(sourceMac, sourceMac + pendingSourceMac_.size(), pendingSourceMac_.begin());
-  pending_ = true;
+  // Callback only copies one bounded packet. Parsing/CRC and all storage work
+  // run on the activity loop; a full mailbox is retried by the sender.
+  if (!pending_) {
+    memcpy(pendingPacket_.data(), data, static_cast<size_t>(length));
+    pendingLength_ = static_cast<size_t>(length);
+    std::copy(sourceMac, sourceMac + pendingSourceMac_.size(), pendingSourceMac_.begin());
+    pending_ = true;
+  }
   xSemaphoreGive(pendingMutex_);
 }
 
 bool StickyNotesActivity::sendAck(const uint8_t* peerMac, const uint32_t sequence) {
-  const auto ack = sticky_note::makeAck(sequence);
+  const auto ack = sticky_note::makeAck(sequence, assembly_.version());
   return radio_.send(peerMac, ack.data(), ack.size());
 }
 #endif
