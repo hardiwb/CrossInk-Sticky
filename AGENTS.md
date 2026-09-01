@@ -1,3 +1,70 @@
+## PlatformIO / CMake Safety Rule
+
+When a PlatformIO build fails, especially with CMake-related errors, do NOT assume the global PlatformIO installation is corrupted.
+
+Do NOT delete, reinstall, prune, upgrade, downgrade, or modify:
+
+- `%USERPROFILE%\.platformio`
+- `%USERPROFILE%\.platformio\packages`
+- `%USERPROFILE%\.platformio\platforms`
+- PlatformIO's Python environment
+- global ESP-IDF / Arduino framework packages
+- global toolchains
+
+unless I explicitly approve it.
+
+When switching projects or environments, use this troubleshooting order:
+
+1. Run the normal project build first:
+   `pio run -e <env>`
+
+2. If it is a CMake/build-state error, inspect the FIRST meaningful error in the log.
+
+3. If stale build state is plausible, remove ONLY:
+   `.pio/build/`
+
+   then rebuild.
+
+4. If the error points to broken/mismatched project libraries, remove ONLY:
+   `.pio/libdeps/<env>/`
+
+   then rebuild.
+
+5. If project-local state still appears corrupted, you may remove the entire project's:
+   `.pio/`
+
+   then rebuild.
+
+6. After that, inspect:
+   - `platformio.ini`
+   - `CMakeLists.txt`
+   - component `CMakeLists.txt`
+   - `lib_deps`
+   - expected PlatformIO platform version
+   - expected ESP-IDF / Arduino framework version
+
+7. Different projects may legitimately use different framework/toolchain versions. Multiple versions can coexist in the global PlatformIO package directory. Do not delete an existing version just because another project needs a different one.
+
+8. A CMake failure, compiler error, linker error, missing header, or dependency error is NOT sufficient evidence that the global PlatformIO installation is corrupted.
+
+9. If you believe a global PlatformIO package is genuinely corrupted, STOP before changing anything.
+
+Report:
+- exact package name
+- installed version
+- exact error
+- evidence that the global package itself is corrupted
+- proposed repair command
+- what would need to be downloaded again
+
+Wait for my explicit approval before performing the repair.
+
+Primary rule:
+
+PROJECT-LOCAL CLEANUP FIRST.
+GLOBAL PLATFORMIO REPAIR LAST.
+NEVER DELETE `.platformio` JUST TO GET A CLEAN BUILD.
+
 # CrossInk — Shared Agent Guide
 
 This is the canonical repo instruction file.
@@ -117,6 +184,25 @@ Project: Open-source e-reader firmware for ESP32-C3 and ESP32-S3 devices.
   - `find src lib include test -name "*.cpp" -o -name "*.h" | xargs clang-format -i` for formatting touched C++ files.
 - For crash debugging, check serial logs, internal heap with `ESP.getFreeHeap()` and `ESP.getMaxAllocHeap()`, task stack high-water marks, and whether cache files need clearing. On S3 targets, also inspect PSRAM free space and largest allocatable block; abundant PSRAM does not prove that internal-RAM or DMA-capable allocations can succeed.
 - Hardware verification should mention the concrete device path to test, expected UI/log behavior, and any cache reset needed.
+
+### PlatformIO Environment Safety
+- Treat the user's global PlatformIO installation as user-managed infrastructure.
+- Do not delete, prune, reinstall, upgrade, downgrade, or otherwise modify the global PlatformIO environment unless the user explicitly requests it.
+- In particular, do not modify or delete `~/.platformio`, `%USERPROFILE%\.platformio`, its `packages/`, `platforms/`, or PlatformIO Python environment as a troubleshooting step.
+- Do not run `pio upgrade`, `pio pkg update`, `pio system prune`, forced package reinstalls, or framework/toolchain reinstalls without explicit user approval.
+- Different projects and environments may legitimately require different platform, framework, or toolchain versions. Multiple versions may coexist; this is not evidence of corruption.
+- When switching environments, first run the appropriate existing `pio run -e <env>` command and allow PlatformIO to resolve genuinely missing project dependencies normally.
+- A compiler error, linker error, missing library, or project configuration error is not evidence that the global PlatformIO installation is corrupted.
+- For suspicious build-state problems, prefer this escalation order:
+  1. Inspect the complete error.
+  2. Fix source, dependency, or project configuration issues if applicable.
+  3. Run the normal build again.
+  4. Run `pio run -t clean` if stale project build artifacts are plausible.
+  5. If necessary, remove only this repository's `.pio/` build directory and rebuild.
+  6. If evidence points to an actually corrupted global PlatformIO package, stop and report the exact package, version, error, evidence of corruption, and proposed repair command.
+  7. Wait for explicit user approval before modifying the global PlatformIO environment.
+- Never delete the global PlatformIO environment merely to obtain a clean build.
+- Preserve known-working pinned platform/framework versions. Do not replace them with `stable`, `latest`, or another moving target without a project-specific reason.
 
 ## Generated Files
 

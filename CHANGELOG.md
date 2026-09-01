@@ -8,6 +8,10 @@
 
 - Larger sticky notes use tighter card spacing, with a More indicator when additional rows do not fit the single sleep screen.
 
+### Fixed
+
+- Sticky Notes custom fonts render again when adjustable built-in note font sizes are enabled.
+
 ## [v1.5.0] - 2026-08-08
 
 ### Added

@@ -75,13 +75,6 @@ StickyNotesActivity::~StickyNotesActivity() {
 
 void StickyNotesActivity::onEnter() {
   Activity::onEnter();
-  if (SETTINGS.stickyNoteSdFontFamilyName[0] != '\0') {
-    // At most 2090 bytes for text + date; too large for the C3 task stack.
-    // Activity-owned scratch avoids growing a temporary string during render.
-    noteGlyphs_ = makeUniqueNoThrow<char[]>(NOTE_GLYPH_BYTES);
-    if (!noteGlyphs_) LOG_ERR(LOG_TAG, "Cannot allocate %u font scratch bytes; using built-in font",
-                            static_cast<unsigned>(NOTE_GLYPH_BYTES));
-  }
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
   app_.setTheme(uiThemeTokens(uiTarget_));
   app_.on(ACTION_RECEIVE, &StickyNotesActivity::onRowEvent, this);
@@ -205,6 +198,14 @@ void StickyNotesActivity::startReceiving() {
 #else
   stopReceiving();
   sdFontSystem.releaseLoadedFont(renderer);
+  if (SETTINGS.stickyNoteSdFontFamilyName[0] != '\0' && !noteGlyphs_) {
+    // Allocate after releasing the reader SD font and its glyph caches. This
+    // 2090-byte buffer is too large for the C3 task stack and may not fit while
+    // the previous font's cache is still resident.
+    noteGlyphs_ = makeUniqueNoThrow<char[]>(NOTE_GLYPH_BYTES);
+    if (!noteGlyphs_) LOG_ERR(LOG_TAG, "Cannot allocate %u font scratch bytes; using built-in font",
+                            static_cast<unsigned>(NOTE_GLYPH_BYTES));
+  }
   radioUsed_ = true;
   if (!pendingMutex_) {
     setError(StrId::STR_STICKY_NOTE_RADIO_FAILED);
