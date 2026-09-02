@@ -198,6 +198,7 @@ void StickyNotesActivity::startReceiving() {
 #else
   stopReceiving();
   sdFontSystem.releaseLoadedFont(renderer);
+  noteFontId_ = builtInNoteFontId(SETTINGS.stickyNoteFontPointSize);
   if (SETTINGS.stickyNoteSdFontFamilyName[0] != '\0' && !noteGlyphs_) {
     // Allocate after releasing the reader SD font and its glyph caches. This
     // 2090-byte buffer is too large for the C3 task stack and may not fit while
@@ -205,6 +206,21 @@ void StickyNotesActivity::startReceiving() {
     noteGlyphs_ = makeUniqueNoThrow<char[]>(NOTE_GLYPH_BYTES);
     if (!noteGlyphs_) LOG_ERR(LOG_TAG, "Cannot allocate %u font scratch bytes; using built-in font",
                             static_cast<unsigned>(NOTE_GLYPH_BYTES));
+  }
+  if (noteGlyphs_ && SETTINGS.stickyNoteSdFontFamilyName[0] != '\0') {
+    // Load the selected font before ESP-NOW starts. Wi-Fi consumes internal
+    // heap, and deferring this swap until a note arrived could trip the
+    // dictionary-font headroom gate and silently leave the built-in font active.
+    const auto activation = sdFontSystem.activateDictionaryFont(renderer, SETTINGS.stickyNoteSdFontFamilyName,
+                                                                SETTINGS.stickyNoteFontPointSize);
+    if (activation.usingDictionaryFont && activation.fontId != 0) {
+      noteFontId_ = activation.fontId;
+    } else {
+      LOG_ERR(LOG_TAG, "Failed to activate Sticky Notes font %s; using built-in font",
+              SETTINGS.stickyNoteSdFontFamilyName);
+      sdFontSystem.releaseLoadedFont(renderer);
+    }
+    sdFontSystem.releaseRegistry();
   }
   radioUsed_ = true;
   if (!pendingMutex_) {
@@ -247,13 +263,6 @@ void StickyNotesActivity::processPendingNote() {
           static_cast<unsigned>(note_.messageLength),
           static_cast<unsigned>(sticky_note::chunkCount(note_.messageLength)),
           static_cast<unsigned>(assembly_.version()));
-  noteFontId_ = builtInNoteFontId(SETTINGS.stickyNoteFontPointSize);
-  if (noteGlyphs_ && SETTINGS.stickyNoteSdFontFamilyName[0] != '\0') {
-    const auto activation = sdFontSystem.activateDictionaryFont(renderer, SETTINGS.stickyNoteSdFontFamilyName,
-                                                                SETTINGS.stickyNoteFontPointSize);
-    if (activation.usingDictionaryFont && activation.fontId != 0) noteFontId_ = activation.fontId;
-    sdFontSystem.releaseRegistry();
-  }
   setState(State::Applying);
   if (requestUpdateAndWait() != RequestUpdateResult::Rendered || !saveNoteSleepImage() || !selectNoteSleepImage()) {
     setError(StrId::STR_STICKY_NOTE_SAVE_FAILED);
@@ -331,7 +340,9 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
     if (noteGlyphs_) snprintf(noteGlyphs_.get(), NOTE_GLYPH_BYTES, "%s\n%s", dateLine, note_.message.data());
     auto* fontCache = renderer.getFontCacheManager();
     const uint8_t styleMask = noteStyle == EpdFontFamily::BOLD ? 0x03 : 0x01;
-    if (!noteGlyphs_ || !fontCache || !fontCache->prewarmCache(noteFontId_, noteGlyphs_.get(), styleMask)) {
+    if (!noteGlyphs_ || !fontCache ||
+        !fontCache->prewarmCache(noteFontId_, noteGlyphs_.get(), styleMask,
+                                 FontCacheManager::PreparationPolicy::DictionaryLean)) {
       LOG_ERR(LOG_TAG, "Failed to prepare Sticky Notes SD font; using built-in font");
       noteFontId_ = builtInNoteFontId(SETTINGS.stickyNoteFontPointSize);
     }

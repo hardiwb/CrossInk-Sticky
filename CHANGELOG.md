@@ -10,7 +10,8 @@
 
 ### Fixed
 
-- Sticky Notes custom fonts render again when adjustable built-in note font sizes are enabled.
+- Sticky Notes loads its selected custom font before ESP-NOW starts and prepares note glyphs with lower memory
+  overhead, avoiding an unintended fallback to the built-in font.
 
 ## [v1.5.0] - 2026-08-08
 
