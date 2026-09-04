@@ -1565,17 +1565,33 @@ void HomeActivity::loop() {
           requestUpdate();
           break;
         case 1:
+          if (!recentBooks.empty()) {
+            onContinueReading();
+          } else {
 #if CROSSINK_ENABLE_STICKY_NOTES
-          onStickyNotesOpen();
+            onStickyNotesOpen();
 #else
-          onFileBrowserOpen();
+            onFileBrowserOpen();
 #endif
+          }
           break;
         case 2:
-          onSettingsOpen();
+#if CROSSINK_ENABLE_STICKY_NOTES
+          if (!recentBooks.empty()) {
+            onStickyNotesOpen();
+          } else {
+            onSettingsOpen();
+          }
+#else
+          if (!recentBooks.empty()) {
+            onFileBrowserOpen();
+          } else {
+            onSettingsOpen();
+          }
+#endif
           break;
         case 3:
-          onContinueReading();
+          onSettingsOpen();
           break;
       }
     };
@@ -1590,8 +1606,8 @@ void HomeActivity::loop() {
     }
     int touchedBookIndex = -1;
     if (mappedInput.wasCoverTouchedDown(touchedBookIndex) && touchedBookIndex >= 0 && !recentBooks.empty()) {
-      if (minimalHomeNavIndex != 3) {
-        minimalHomeNavIndex = 3;
+      if (minimalHomeNavIndex != 1) {
+        minimalHomeNavIndex = 1;
         requestUpdate();
       }
       return;
@@ -1602,7 +1618,7 @@ void HomeActivity::loop() {
       return;
     }
     if (mappedInput.wasCoverTapped(touchedBookIndex) && touchedBookIndex >= 0 && !recentBooks.empty()) {
-      minimalHomeNavIndex = 3;
+      minimalHomeNavIndex = 1;
       onContinueReading();
       return;
     }
@@ -1948,11 +1964,17 @@ void HomeActivity::render(RenderLock&&) {
     if (showMinimalHomeButtonHints(mappedInput)) {
       MinimalTheme::setHomeButtonHintSelection(minimalHomeNavIndex);
 #if CROSSINK_ENABLE_STICKY_NOTES
-      GUI.drawButtonHints(renderer, tr(STR_MENU), tr(STR_STICKY_NOTES), tr(STR_SETTINGS_SHORT),
-                          recentBooks.empty() ? "" : tr(STR_READ));
+      if (recentBooks.empty()) {
+        GUI.drawButtonHints(renderer, tr(STR_MENU), tr(STR_STICKY_NOTES), tr(STR_SETTINGS_SHORT), "");
+      } else {
+        GUI.drawButtonHints(renderer, tr(STR_MENU), tr(STR_READ), tr(STR_STICKY_NOTES), tr(STR_SETTINGS_SHORT));
+      }
 #else
-      GUI.drawButtonHints(renderer, tr(STR_MENU), tr(STR_BROWSE), tr(STR_SETTINGS_SHORT),
-                          recentBooks.empty() ? "" : tr(STR_READ));
+      if (recentBooks.empty()) {
+        GUI.drawButtonHints(renderer, tr(STR_MENU), tr(STR_BROWSE), tr(STR_SETTINGS_SHORT), "");
+      } else {
+        GUI.drawButtonHints(renderer, tr(STR_MENU), tr(STR_READ), tr(STR_BROWSE), tr(STR_SETTINGS_SHORT));
+      }
 #endif
     }
 
