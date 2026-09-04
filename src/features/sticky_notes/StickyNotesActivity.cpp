@@ -33,6 +33,10 @@ constexpr const char* WEEKDAY_NAMES[] = {"Sunday", "Monday", "Tuesday", "Wednesd
 constexpr const char* MONTH_NAMES[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
+const char* noteRowText(const char* row) {
+  return row && row[0] == '[' && row[1] == ' ' && row[2] == ']' && row[3] == ' ' ? row + 4 : row;
+}
+
 constexpr bool isLeapYear(const uint16_t year) {
   return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 }
@@ -524,7 +528,7 @@ bool StickyNotesActivity::drawNoteCards(const int left, const int right, const i
     char* newline = strchr(row, '\n');
     if (newline) *newline = '\0';
     const int remainingLines = std::max(1, (bottom - cardY - cardPaddingY * 2) / lineHeight);
-    const auto lines = renderer.wrappedText(noteFontId_, row, textWidth, remainingLines, noteStyle);
+    const auto lines = renderer.wrappedText(noteFontId_, noteRowText(row), textWidth, remainingLines, noteStyle);
     const int cardHeight = cardPaddingY * 2 + static_cast<int>(lines.size()) * lineHeight;
     renderer.fillRoundedRect(cardLeft, cardY, cardWidth, cardHeight, cardRadius, Color::LightGray);
 

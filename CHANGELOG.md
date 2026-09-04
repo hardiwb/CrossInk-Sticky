@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- Sticky Notes no longer display the unfinished checklist marker `[ ]` in received note rows.
 - Sticky Notes loads its selected custom font before ESP-NOW starts and prepares note glyphs with lower memory
   overhead, avoiding an unintended fallback to the built-in font.
 
