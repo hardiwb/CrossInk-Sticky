@@ -3,6 +3,7 @@
 ### Added
 
 - Sticky Notes receives up to 2 KB of dated checklist text using numbered ESP-NOW chunks, whole-message validation, and retry-safe acknowledgements. Existing 220-byte senders remain compatible.
+- Sticky Notes can render a calendar lock screen with the received date highlighted and the note rows listed below it.
 
 ### Changed
 

@@ -85,6 +85,9 @@ class StickyNotesActivity final : public Activity {
   void exitActivity();
   void drawStatusScreen(const char* status, bool showReceiveAction);
   void drawNoteTemplate(bool showSavedStatus);
+  void drawCalendarTemplate(const Rect& safeArea, const char* dateLine, EpdFontFamily::Style noteStyle,
+                            bool showSavedStatus);
+  bool drawNoteCards(int left, int right, int top, int bottom, EpdFontFamily::Style noteStyle, bool compact);
   bool saveNoteSleepImage();
   bool selectNoteSleepImage();
 

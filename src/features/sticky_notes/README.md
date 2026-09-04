@@ -67,3 +67,7 @@ Only the rendered image is persisted, not a paginated/full-text notebook.
 The generated 1-bit bitmap is installed atomically at
 `/.sleep/sticky-note.bmp`, selected as the favorite custom sleep image, and
 picked up by the firmware's existing sleep-screen scanner on the next sleep.
+Choose **Settings > Reader > Font Options > Sticky Notes Layout > Calendar**
+to put a Monday-first month grid above the received note rows. The received
+date is highlighted with a light-gray rounded marker. The default Classic
+layout remains unchanged.

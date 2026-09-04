@@ -405,6 +405,7 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   if (stickyNoteSdFontFamilyName[0] != '\0') doc["stickyNoteFont"] = stickyNoteSdFontFamilyName;
   doc["stickyNoteFontSize"] = stickyNoteFontPointSize;
   doc["stickyNoteBold"] = stickyNoteBold;
+  doc["stickyNoteLayout"] = stickyNoteLayout;
   doc["language"] = (language < getLanguageCount()) ? LANGUAGE_CODES[language] : "EN";
   doc["tiltPageTurnDirectionSchema"] = TILT_DIRECTION_SCHEMA_CURRENT;
   doc["clockDateHasBeenSynced"] = clockDateHasBeenSynced;
@@ -578,6 +579,8 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   stickyNoteSdFontFamilyName[sizeof(stickyNoteSdFontFamilyName) - 1] = '\0';
   stickyNoteFontPointSize = doc["stickyNoteFontSize"] | static_cast<uint8_t>(12);
   stickyNoteBold = doc["stickyNoteBold"] | static_cast<uint8_t>(1);
+  stickyNoteLayout = clamp(doc["stickyNoteLayout"] | static_cast<uint8_t>(STICKY_NOTE_CARDS),
+                           STICKY_NOTE_LAYOUT_COUNT, static_cast<uint8_t>(STICKY_NOTE_CARDS));
   if (storedFontFamily >= BUILTIN_FONT_COUNT) needsResave = true;
   if (doc["lineHeightPercent"].isNull() && !doc["lineSpacing"].isNull()) {
     const uint8_t legacySpacing =

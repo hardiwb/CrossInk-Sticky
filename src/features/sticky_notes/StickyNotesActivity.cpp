@@ -32,6 +32,25 @@ constexpr const char* WEEKDAY_NAMES[] = {"Sunday", "Monday", "Tuesday", "Wednesd
 constexpr const char* MONTH_NAMES[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
+constexpr bool isLeapYear(const uint16_t year) {
+  return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+}
+
+uint8_t daysInMonth(const uint16_t year, const uint8_t month) {
+  static constexpr uint8_t DAYS[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  return month == 2 && isLeapYear(year) ? 29 : DAYS[month - 1];
+}
+
+// Sakamoto's algorithm returns Sunday as zero. Convert it to a Monday-first index.
+int mondayFirstWeekday(const uint16_t year, const uint8_t month, const uint8_t day) {
+  static constexpr int OFFSETS[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+  int adjustedYear = year;
+  if (month < 3) --adjustedYear;
+  const int sundayFirst =
+      (adjustedYear + adjustedYear / 4 - adjustedYear / 100 + adjustedYear / 400 + OFFSETS[month - 1] + day) % 7;
+  return (sundayFirst + 6) % 7;
+}
+
 int builtInNoteFontId(const uint8_t pointSize) {
   if (pointSize <= 10) return UI_10_FONT_ID;
   return UI_12_FONT_ID;
@@ -327,12 +346,6 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
   const int sideInset = std::max(12, safeArea.width / 24);
   const int left = safeArea.x + sideInset;
   const int right = safeArea.x + safeArea.width - sideInset - 1;
-  const int titleY = safeArea.y + 16;
-  const int titleLineHeight = renderer.getLineHeight(UI_12_FONT_ID);
-  UITheme::drawCenteredText(renderer, safeArea, UI_12_FONT_ID, titleY, tr(STR_NOTES_TITLE), true, EpdFontFamily::BOLD);
-
-  const int firstRuleY = titleY + titleLineHeight + 14;
-  renderer.drawLine(left, firstRuleY, right, firstRuleY, 2, true);
   char dateLine[40];
   formatNoteDate(note_, dateLine, sizeof(dateLine));
   const auto noteStyle = SETTINGS.stickyNoteBold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
@@ -347,6 +360,18 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
       noteFontId_ = builtInNoteFontId(SETTINGS.stickyNoteFontPointSize);
     }
   }
+
+  if (SETTINGS.stickyNoteLayout == CrossPointSettings::STICKY_NOTE_CALENDAR) {
+    drawCalendarTemplate(safeArea, dateLine, noteStyle, showSavedStatus);
+    return;
+  }
+
+  const int titleY = safeArea.y + 16;
+  const int titleLineHeight = renderer.getLineHeight(UI_12_FONT_ID);
+  UITheme::drawCenteredText(renderer, safeArea, UI_12_FONT_ID, titleY, tr(STR_NOTES_TITLE), true, EpdFontFamily::BOLD);
+
+  const int firstRuleY = titleY + titleLineHeight + 14;
+  renderer.drawLine(left, firstRuleY, right, firstRuleY, 2, true);
   const int dateY = firstRuleY + 16;
   UITheme::drawCenteredText(renderer, safeArea, noteFontId_, dateY, dateLine);
 
@@ -356,22 +381,117 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
   const int footerReserve = showSavedStatus || largeNote ? renderer.getLineHeight(SMALL_FONT_ID) + 20 : 0;
   const int messageTop = secondRuleY + 22;
   const int messageBottom = safeArea.y + safeArea.height - footerReserve;
-  const int lineHeight = renderer.getLineHeight(noteFontId_) + (largeNote ? 2 : 5);
+  const bool truncated = drawNoteCards(left, right, messageTop, messageBottom, noteStyle, largeNote);
+
+  if (largeNote && truncated) {
+    UITheme::drawCenteredText(renderer, safeArea, SMALL_FONT_ID,
+                              safeArea.y + safeArea.height - renderer.getLineHeight(SMALL_FONT_ID) - 4,
+                              tr(STR_MORE));
+  } else if (showSavedStatus) {
+    UITheme::drawCenteredText(renderer, safeArea, SMALL_FONT_ID,
+                              safeArea.y + safeArea.height - renderer.getLineHeight(SMALL_FONT_ID) - 4,
+                              tr(STR_STICKY_NOTE_SAVED));
+  }
+}
+
+void StickyNotesActivity::drawCalendarTemplate(const Rect& safeArea, const char* dateLine,
+                                               const EpdFontFamily::Style noteStyle,
+                                               const bool showSavedStatus) {
+  const int sideInset = std::max(12, safeArea.width / 24);
+  const int left = safeArea.x + sideInset;
+  const int right = safeArea.x + safeArea.width - sideInset - 1;
+  const int width = right - left + 1;
+  const int dateY = safeArea.y + 16;
+  UITheme::drawCenteredText(renderer, safeArea, UI_12_FONT_ID, dateY, dateLine, true, EpdFontFamily::BOLD);
+
+  static constexpr StrId WEEKDAY_LABELS[] = {StrId::STR_WEEKDAY_MO, StrId::STR_WEEKDAY_TU, StrId::STR_WEEKDAY_WE,
+                                             StrId::STR_WEEKDAY_TH, StrId::STR_WEEKDAY_FR, StrId::STR_WEEKDAY_SA,
+                                             StrId::STR_WEEKDAY_SU};
+  const int cellWidth = width / 7;
+  const int weekdayY = dateY + renderer.getLineHeight(UI_12_FONT_ID) + 22;
+  for (int column = 0; column < 7; ++column) {
+    const char* label = I18n::getInstance().get(WEEKDAY_LABELS[column]);
+    const int labelX = left + column * cellWidth + (cellWidth - renderer.getTextWidth(UI_10_FONT_ID, label,
+                                                                                     EpdFontFamily::BOLD)) /
+                                                     2;
+    renderer.drawText(UI_10_FONT_ID, labelX, weekdayY, label, true, EpdFontFamily::BOLD);
+  }
+
+  const int firstWeekday = mondayFirstWeekday(note_.year, note_.month, 1);
+  const int monthDays = daysInMonth(note_.year, note_.month);
+  const uint8_t previousMonth = note_.month == 1 ? 12 : note_.month - 1;
+  const uint16_t previousYear = note_.month == 1 ? note_.year - 1 : note_.year;
+  const int previousMonthDays = daysInMonth(previousYear, previousMonth);
+  const int rowCount = (firstWeekday + monthDays + 6) / 7;
+  const int cellHeight = renderer.getLineHeight(UI_10_FONT_ID) + 14;
+  const int calendarTop = weekdayY + renderer.getLineHeight(UI_10_FONT_ID) + 12;
+
+  for (int cell = 0; cell < rowCount * 7; ++cell) {
+    const int monthDay = cell - firstWeekday + 1;
+    const bool inCurrentMonth = monthDay >= 1 && monthDay <= monthDays;
+    const int shownDay = monthDay < 1 ? previousMonthDays + monthDay : (monthDay > monthDays ? monthDay - monthDays
+                                                                                             : monthDay);
+    const int column = cell % 7;
+    const int row = cell / 7;
+    const int cellX = left + column * cellWidth;
+    const int cellY = calendarTop + row * cellHeight;
+    const bool selected = inCurrentMonth && monthDay == note_.day;
+    const int dayFont = inCurrentMonth ? UI_10_FONT_ID : SMALL_FONT_ID;
+    const auto dayStyle = selected ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+
+    char dayText[3];
+    snprintf(dayText, sizeof(dayText), "%d", shownDay);
+    const int dayWidth = renderer.getTextWidth(dayFont, dayText, dayStyle);
+    const int dayLineHeight = renderer.getLineHeight(dayFont);
+    const int dayX = cellX + (cellWidth - dayWidth) / 2;
+    const int dayY = cellY + (cellHeight - dayLineHeight) / 2;
+    if (selected) {
+      const int highlightWidth = std::min(cellWidth - 8, dayWidth + 20);
+      renderer.fillRoundedRect(cellX + (cellWidth - highlightWidth) / 2, cellY + 2, highlightWidth, cellHeight - 4,
+                               (cellHeight - 4) / 2, Color::LightGray);
+    }
+    renderer.drawText(dayFont, dayX, dayY, dayText, true, dayStyle);
+  }
+
+  const int calendarBottom = calendarTop + rowCount * cellHeight;
+  const int notesY = calendarBottom + 16;
+  renderer.drawText(UI_10_FONT_ID, left, notesY, tr(STR_NOTES_TITLE), true, EpdFontFamily::BOLD);
+  const int ruleY = notesY + renderer.getLineHeight(UI_10_FONT_ID) + 9;
+  renderer.drawLine(left, ruleY, right, ruleY, 2, true);
+
+  const bool largeNote = note_.messageLength > sticky_note::CHUNK_BYTES;
+  const int footerReserve = showSavedStatus || largeNote ? renderer.getLineHeight(SMALL_FONT_ID) + 20 : 0;
+  const int messageBottom = safeArea.y + safeArea.height - footerReserve;
+  const bool truncated = drawNoteCards(left, right, ruleY + 14, messageBottom, noteStyle, true);
+  if (largeNote && truncated) {
+    UITheme::drawCenteredText(renderer, safeArea, SMALL_FONT_ID,
+                              safeArea.y + safeArea.height - renderer.getLineHeight(SMALL_FONT_ID) - 4,
+                              tr(STR_MORE));
+  } else if (showSavedStatus) {
+    UITheme::drawCenteredText(renderer, safeArea, SMALL_FONT_ID,
+                              safeArea.y + safeArea.height - renderer.getLineHeight(SMALL_FONT_ID) - 4,
+                              tr(STR_STICKY_NOTE_SAVED));
+  }
+}
+
+bool StickyNotesActivity::drawNoteCards(const int left, const int right, const int top, const int bottom,
+                                        const EpdFontFamily::Style noteStyle, const bool compact) {
+  const int lineHeight = renderer.getLineHeight(noteFontId_) + (compact ? 2 : 5);
   constexpr int cardPaddingX = 12;
-  const int cardPaddingY = largeNote ? 4 : 8;
-  const int cardGap = largeNote ? 3 : 8;
+  const int cardPaddingY = compact ? 4 : 8;
+  const int cardGap = compact ? 3 : 8;
   constexpr int cardRadius = 10;
   const int cardLeft = left;
   const int cardWidth = std::max(1, right - cardLeft + 1);
   const int textLeft = cardLeft + cardPaddingX;
   const int textWidth = std::max(1, cardWidth - cardPaddingX * 2);
-  int cardY = messageTop;
+  int cardY = top;
   char* row = note_.message.data();
 
-  while (row && *row && cardY + cardPaddingY * 2 + lineHeight <= messageBottom) {
+  while (row && *row && cardY + cardPaddingY * 2 + lineHeight <= bottom) {
     char* newline = strchr(row, '\n');
     if (newline) *newline = '\0';
-    const int remainingLines = std::max(1, (messageBottom - cardY - cardPaddingY * 2) / lineHeight);
+    const int remainingLines = std::max(1, (bottom - cardY - cardPaddingY * 2) / lineHeight);
     const auto lines = renderer.wrappedText(noteFontId_, row, textWidth, remainingLines, noteStyle);
     const int cardHeight = cardPaddingY * 2 + static_cast<int>(lines.size()) * lineHeight;
     renderer.fillRoundedRect(cardLeft, cardY, cardWidth, cardHeight, cardRadius, Color::LightGray);
@@ -391,16 +511,7 @@ void StickyNotesActivity::drawNoteTemplate(const bool showSavedStatus) {
       break;
     }
   }
-
-  if (largeNote && row && *row) {
-    UITheme::drawCenteredText(renderer, safeArea, SMALL_FONT_ID,
-                             safeArea.y + safeArea.height - renderer.getLineHeight(SMALL_FONT_ID) - 4,
-                             tr(STR_MORE));
-  } else if (showSavedStatus) {
-    UITheme::drawCenteredText(renderer, safeArea, SMALL_FONT_ID,
-                              safeArea.y + safeArea.height - renderer.getLineHeight(SMALL_FONT_ID) - 4,
-                              tr(STR_STICKY_NOTE_SAVED));
-  }
+  return row && *row;
 }
 
 bool StickyNotesActivity::saveNoteSleepImage() {

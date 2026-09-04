@@ -43,6 +43,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     INVERTED_BLACK_AND_WHITE = 2,
     SLEEP_SCREEN_COVER_FILTER_COUNT
   };
+  enum STICKY_NOTE_LAYOUT { STICKY_NOTE_CARDS = 0, STICKY_NOTE_CALENDAR = 1, STICKY_NOTE_LAYOUT_COUNT };
 
   // Status bar enum - legacy
   enum STATUS_BAR_MODE {
@@ -456,6 +457,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   char stickyNoteSdFontFamilyName[64] = "";
   uint8_t stickyNoteFontPointSize = 12;
   uint8_t stickyNoteBold = 1;
+  uint8_t stickyNoteLayout = STICKY_NOTE_CARDS;
   // Show hidden files/directories (starting with '.') in the file browser (0 = hidden, 1 = show)
   uint8_t showHiddenFiles = 0;
   // Hide file extensions in the file browser right-side value column (0 = show, 1 = hide)

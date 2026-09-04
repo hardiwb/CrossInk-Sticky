@@ -98,6 +98,7 @@ in the normal CrossInk settings JSON.
 | `stickyNoteFont` | `stickyNoteSdFontFamilyName` | empty | Empty uses the built-in Inter UI font; otherwise names an installed `.cpfont` family. |
 | `stickyNoteFontSize` | `stickyNoteFontPointSize` | `12` | Built-in choices are 10 pt and 12 pt. SD fonts expose the sizes installed for that family. |
 | `stickyNoteBold` | `stickyNoteBold` | `1` | Bold note content when enabled. The date stays regular. |
+| `stickyNoteLayout` | `stickyNoteLayout` | `0` | `0` keeps the classic cards layout; `1` adds a Monday-first calendar with the note date highlighted. |
 
 SD-card glyphs must be prepared before text measurement and drawing. The
 Sticky Notes renderer prewarms the date and complete message with the required
