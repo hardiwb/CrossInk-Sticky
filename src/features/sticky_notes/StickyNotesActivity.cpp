@@ -18,6 +18,7 @@
 #include "MappedInputManager.h"
 #include "SdCardFontSystem.h"
 #include "SilentRestart.h"
+#include "StickyNotesStore.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
@@ -282,6 +283,10 @@ void StickyNotesActivity::processPendingNote() {
           static_cast<unsigned>(note_.messageLength),
           static_cast<unsigned>(sticky_note::chunkCount(note_.messageLength)),
           static_cast<unsigned>(assembly_.version()));
+  if (!sticky_note::Store::save(note_)) {
+    setError(StrId::STR_STICKY_NOTE_SAVE_FAILED);
+    return;
+  }
   setState(State::Applying);
   if (requestUpdateAndWait() != RequestUpdateResult::Rendered || !saveNoteSleepImage() || !selectNoteSleepImage()) {
     setError(StrId::STR_STICKY_NOTE_SAVE_FAILED);
@@ -451,6 +456,11 @@ void StickyNotesActivity::drawCalendarTemplate(const Rect& safeArea, const char*
                                (cellHeight - 4) / 2, Color::LightGray);
     }
     renderer.drawText(dayFont, dayX, dayY, dayText, true, dayStyle);
+    if (inCurrentMonth && sticky_note::Store::has(note_.year, note_.month, static_cast<uint8_t>(monthDay))) {
+      constexpr int markerSize = 4;
+      renderer.fillRoundedRect(cellX + (cellWidth - markerSize) / 2, cellY + cellHeight - markerSize - 1, markerSize,
+                               markerSize, markerSize / 2, Color::Black);
+    }
   }
 
   const int calendarBottom = calendarTop + rowCount * cellHeight;

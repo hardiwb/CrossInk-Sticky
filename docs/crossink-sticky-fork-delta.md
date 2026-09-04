@@ -59,9 +59,12 @@ CrossInk-Sticky adds a receive-only Sticky Notes application:
 5. A validated note is rendered to `/.sleep/sticky-note.bmp`, installed as the
    selected custom sleep image, and discovered by CrossInk's existing sleep
    image scanner.
-6. An ACK is sent only after rendering, file replacement, and sleep-image
+6. The validated source text is atomically upserted by date under
+   `/.crosspoint/calendar/`. Calendar layout marks every stored date in the
+   displayed month.
+7. An ACK is sent only after calendar storage, rendering, file replacement, and sleep-image
    selection succeed.
-7. After a successful sync, the app automatically returns to the previous
+8. After a successful sync, the app automatically returns to the previous
    screen. If opened from EPUB, TXT, or XTC reading, the reader is restored
    through the existing silent-restart path.
 
@@ -108,7 +111,8 @@ the selected built-in size.
 
 ## Protocol contract
 
-The wire format is version 1 and must remain compatible with existing senders.
+The wire format supports legacy version 1 and chunked version 2 and must remain
+compatible with existing senders.
 The source of truth is:
 
 - `src/features/sticky_notes/StickyNoteProtocol.h`
@@ -119,8 +123,8 @@ Important constants:
 - Magic: ASCII `CINT`
 - Note packet type: `1`
 - ACK packet type: `2`
-- Header length: 16 bytes
-- Maximum UTF-8 message: 220 bytes
+- Header length: 16 bytes for v1, 24 bytes for v2
+- Maximum UTF-8 message: 2048 bytes (`220` in one v1 packet; larger messages use v2 chunks)
 - Multi-byte integers: little-endian
 - Rows: separated by LF (`0x0A`)
 
@@ -134,6 +138,8 @@ carried forward as a unit:
 
 - `src/features/sticky_notes/StickyNotesConfig.h`
 - `src/features/sticky_notes/StickyNoteProtocol.h`
+- `src/features/sticky_notes/StickyNotesStore.h`
+- `src/features/sticky_notes/StickyNotesStore.cpp`
 - `src/features/sticky_notes/StickyNotesActivity.h`
 - `src/features/sticky_notes/StickyNotesActivity.cpp`
 - `src/features/sticky_notes/README.md`

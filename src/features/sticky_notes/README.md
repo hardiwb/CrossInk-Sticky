@@ -62,7 +62,11 @@ falls back to the built-in font; no second framebuffer is allocated.
 
 The output remains one image. Long transfers use compact card spacing and a
 More indicator for remaining rows; wrapped row text can still be ellipsized.
-Only the rendered image is persisted, not a paginated/full-text notebook.
+Each validated message is also retained by date under
+`/.crosspoint/calendar/YYYY-MM-DD.bin`. Sending the same date again atomically
+replaces that day's entry. Calendar layout marks every retained day in the
+displayed month; the selected day's rows remain subject to the available
+screen space.
 
 The generated 1-bit bitmap is installed atomically at
 `/.sleep/sticky-note.bmp`, selected as the favorite custom sleep image, and

@@ -144,11 +144,17 @@ Both devices must be updated to send more than 220 bytes. Old senders remain
 supported, and the updated BrokenSignal sender uses v1 for small notes. Old
 receivers ignore v2 and will not acknowledge a larger transfer.
 
-This is still a single sleep-screen image, not a paginated notebook. Larger
+Each accepted transfer is an upsert for its header date. CrossInk stores the
+complete validated text under `/.crosspoint/calendar/`; resending the same date
+atomically replaces that day. No protocol change is required for calendar
+storage. In Calendar layout, stored dates in the displayed month receive a dot
+and the most recently received date is selected.
+
+The lock screen remains a single image, not a paginated notebook. Larger
 messages use tighter card spacing. Text can be ellipsized within a row, and
 **More** indicates remaining rows below the screen. The 2 KB transfer allowance
-does not guarantee that every row fits at the selected font size. The complete
-source notes remain on the sender; CrossInk persists only the rendered image.
+does not guarantee that every row fits at the selected font size, but the full
+validated message remains in its dated calendar file.
 
 ## Verification
 

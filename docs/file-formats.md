@@ -1,9 +1,31 @@
 # File Formats
 
-These formats describe the SD-card cache files under `/.crosspoint/epub_<hash>/`.
+These formats describe CrossInk's SD-card data and cache files, including EPUB
+caches under `/.crosspoint/epub_<hash>/`.
 All POD fields are written in the ESP32 little-endian representation used by
 `Serialization.h`; strings are length-prefixed UTF-8 unless a format notes a
 fixed-size char buffer.
+
+## `calendar/YYYY-MM-DD.bin`
+
+### Version 1
+
+Sticky Notes stores one complete UTF-8 message per date under
+`/.crosspoint/calendar/`. A second transfer for the same date replaces the
+existing file atomically through `.tmp` and `.bak` files. The filename is the
+entry date; the file contains:
+
+| Offset | Size | Value |
+| ---: | ---: | --- |
+| 0 | 4 | ASCII `CALS` |
+| 4 | 1 | Format version `1` |
+| 5 | 1 | Reserved zero |
+| 6 | 2 | UTF-8 message byte length, little-endian (`1`-`2048`) |
+| 8 | 4 | CRC-32/ISO-HDLC of the message, little-endian |
+| 12 | N | Exactly N UTF-8 message bytes, without a trailing NUL |
+
+The CRC uses reflected polynomial `0xEDB88320`, initial value `0xFFFFFFFF`,
+and final XOR `0xFFFFFFFF`, matching the Sticky Notes v2 wire protocol.
 
 ## `book.bin`
 
