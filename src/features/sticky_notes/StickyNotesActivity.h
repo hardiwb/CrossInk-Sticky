@@ -61,6 +61,7 @@ class StickyNotesActivity final : public Activity {
   uint32_t listeningStartedMs_ = 0;
   bool radioUsed_ = false;
   bool returnToReader_ = false;
+  bool receivedAny_ = false;
 
 #ifndef SIMULATOR
   HalEspNow radio_;
@@ -72,6 +73,8 @@ class StickyNotesActivity final : public Activity {
   bool pending_ = false;
   uint32_t savedAtMs_ = 0;
   uint32_t lastAckMs_ = 0;
+  uint32_t lastSavedSequence_ = 0;
+  std::array<uint8_t, 6> lastSavedSourceMac_{};
 #endif
 
   static void menuScreen(UiApp::ScreenType& screen, void* user);

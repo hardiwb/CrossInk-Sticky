@@ -121,8 +121,12 @@ void StickyNotesActivity::loop() {
   if (state_ == State::Saved) {
     const uint32_t now = millis();
     if (now - savedAtMs_ >= 2000) {
-      stopReceiving();
-      exitActivity();
+      // Keep the radio session alive for a Cardputer calendar batch. Do not
+      // request a redraw here: the most recently saved lockscreen remains
+      // visible while the next dated note arrives.
+      assembly_.reset();
+      listeningStartedMs_ = now;
+      state_ = State::Listening;
       return;
     }
     if (now - lastAckMs_ >= 350) {
@@ -157,6 +161,11 @@ void StickyNotesActivity::loop() {
   }
 
   if (state_ == State::Listening && millis() - listeningStartedMs_ >= RECEIVE_TIMEOUT_MS) {
+    if (receivedAny_) {
+      stopReceiving();
+      exitActivity();
+      return;
+    }
     stopReceiving();
     setError(StrId::STR_STICKY_NOTE_TIMEOUT);
   }
@@ -252,6 +261,9 @@ void StickyNotesActivity::startReceiving() {
   pendingLength_ = 0;
   assembly_.reset();
   xSemaphoreGive(pendingMutex_);
+  receivedAny_ = false;
+  lastSavedSequence_ = 0;
+  lastSavedSourceMac_.fill(0);
   if (!radio_.begin(ESPNOW_CHANNEL, &StickyNotesActivity::onReceive, this)) {
     setError(StrId::STR_STICKY_NOTE_RADIO_FAILED);
     return;
@@ -279,6 +291,13 @@ void StickyNotesActivity::processPendingNote() {
   xSemaphoreGive(pendingMutex_);
   if (result != sticky_note::ReceiveResult::Complete) return;
 
+  if (receivedAny_ && note_.sequence == lastSavedSequence_ &&
+      std::equal(lastSavedSourceMac_.begin(), lastSavedSourceMac_.end(), assembly_.source())) {
+    sendAck(assembly_.source(), note_.sequence);
+    assembly_.reset();
+    return;
+  }
+
   LOG_INF(LOG_TAG, "Received %u bytes in %u packet(s), protocol v%u",
           static_cast<unsigned>(note_.messageLength),
           static_cast<unsigned>(sticky_note::chunkCount(note_.messageLength)),
@@ -295,6 +314,9 @@ void StickyNotesActivity::processPendingNote() {
 
   const bool ackQueued = sendAck(assembly_.source(), note_.sequence);
   if (!ackQueued) LOG_ERR(LOG_TAG, "Note saved but ACK could not be queued");
+  receivedAny_ = true;
+  lastSavedSequence_ = note_.sequence;
+  std::copy_n(assembly_.source(), lastSavedSourceMac_.size(), lastSavedSourceMac_.begin());
   savedAtMs_ = lastAckMs_ = millis();
   state_ = State::Saved;
 #endif
