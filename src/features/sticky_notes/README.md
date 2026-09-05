@@ -9,6 +9,8 @@ menu entry and activity.
 The complete list of fork-owned files, upstream integration points, persistent
 settings, and update procedure is maintained in the
 [fork delta guide](../../../docs/crossink-sticky-fork-delta.md).
+The planned calendar application and optional half-hour lock-screen refresh are
+described in the [calendar blueprint](../../../docs/calendar-blueprint.md).
 
 Opening **Menu > Sticky Notes** immediately starts Wi-Fi station mode and
 ESP-NOW on channel 1 for 60 seconds. The normal deep-sleep path is unchanged and

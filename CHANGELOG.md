@@ -9,6 +9,7 @@
 ### Changed
 
 - Larger sticky notes use tighter card spacing, with a More indicator when additional rows do not fit the single sleep screen.
+- The Calendar feature now shows an RTC requirement warning on Xteink X4 instead of starting note reception.
 
 ### Fixed
 

@@ -36,7 +36,7 @@ class StickyNotesActivity final : public Activity {
   bool skipLoopDelay() override { return state_ == State::Listening; }
 
  private:
-  enum class State : uint8_t { Ready, Listening, Applying, Saved, Error };
+  enum class State : uint8_t { Ready, Listening, Applying, Saved, Error, Unsupported };
 
   static constexpr uint8_t ESPNOW_CHANNEL = 1;
   static constexpr uint32_t RECEIVE_TIMEOUT_MS = 60000;

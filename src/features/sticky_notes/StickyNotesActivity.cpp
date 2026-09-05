@@ -4,6 +4,7 @@
 
 #include <GfxRenderer.h>
 #include <FontCacheManager.h>
+#include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -103,6 +104,13 @@ void StickyNotesActivity::onEnter() {
   app_.setTheme(uiThemeTokens(uiTarget_));
   app_.on(ACTION_RECEIVE, &StickyNotesActivity::onRowEvent, this);
   app_.setScreen(&StickyNotesActivity::menuScreen, this);
+#if FREEINK_DEVICE_X4 && !defined(SIMULATOR)
+  if (gpio.deviceIsX4()) {
+    state_ = State::Unsupported;
+    requestUpdate();
+    return;
+  }
+#endif
   startReceiving();
 }
 
@@ -187,6 +195,8 @@ void StickyNotesActivity::render(RenderLock&&) {
     status = tr(STR_STICKY_NOTE_LISTENING);
   } else if (state_ == State::Error) {
     status = I18n::getInstance().get(errorId_);
+  } else if (state_ == State::Unsupported) {
+    status = tr(STR_STICKY_NOTE_X4_UNSUPPORTED);
   }
   drawStatusScreen(status, state_ == State::Ready || state_ == State::Error);
   renderer.displayBuffer(screenTransitionRefresh_.modeFor(static_cast<uint8_t>(state_)));
